@@ -6,7 +6,7 @@
   <title>AuditLens AI — EU AI Act Compliance Evidence</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    .blur-gated { filter: blur(5px); pointer-events: none; user-select: none; }
+    /* .blur-gated { filter: blur(5px); pointer-events: none; user-select: none; } — re-enable with Stripe (Priority 5) */
   </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen">
@@ -69,13 +69,10 @@
       <!-- Article Cards -->
       <div id="article-cards" class="space-y-4"></div>
 
-      <!-- CTA Banner -->
+      <!-- CTA Banner — swap back to Stripe upgrade when Priority 5 ships -->
       <div class="bg-gray-900 border border-gray-700 rounded-lg p-6 text-center">
-        <p class="text-lg font-semibold mb-2">Get the full audit-ready PDF with complete evidence details</p>
-        <p class="text-gray-400 text-sm mb-4">Includes remediation guidance, sub-check breakdowns, and GRC-formatted export</p>
-        <a href="#" class="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-lg transition-colors">
-          Upgrade to Pro — $149/mo
-        </a>
+        <p class="text-lg font-semibold mb-2">Audit-ready PDF export coming soon</p>
+        <p class="text-gray-400 text-sm">Download a compliance evidence PDF formatted for auditors and GRC platforms.</p>
       </div>
     </div>
   </main>
@@ -91,7 +88,7 @@
   <script>
     const API_URL = window.location.hostname === 'localhost'
       ? 'http://localhost:8000'
-      : 'http://localhost:8000'; // Replace with Railway URL on deploy
+      : 'https://YOUR_RAILWAY_BACKEND_URL'; // TODO: Set before deploying to Vercel
 
     const ARTICLE_TITLES = {
       'EU_AI_ART_9':  'Risk Management System',
@@ -250,34 +247,20 @@
         card.appendChild(sub);
       }
 
-      // Evidence (gated)
+      // Evidence (visible — re-gate with Stripe in Priority 5)
       if (check.evidence?.description) {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'mt-3 relative';
-
         const ev = document.createElement('p');
-        ev.className = 'text-sm text-gray-300 blur-gated';
+        ev.className = 'text-sm text-gray-300 mt-3';
         ev.textContent = `Evidence: ${check.evidence.description}`;
-        wrapper.appendChild(ev);
-
-        const overlay = createUpgradeOverlay();
-        wrapper.appendChild(overlay);
-        card.appendChild(wrapper);
+        card.appendChild(ev);
       }
 
-      // Remediation (gated)
+      // Remediation (visible — re-gate with Stripe in Priority 5)
       if (check.remediation) {
-        const wrapper = document.createElement('div');
-        wrapper.className = 'mt-2 relative';
-
         const rem = document.createElement('p');
-        rem.className = 'text-sm text-gray-300 blur-gated';
+        rem.className = 'text-sm text-gray-300 mt-2';
         rem.textContent = `Remediation: ${check.remediation}`;
-        wrapper.appendChild(rem);
-
-        const overlay = createUpgradeOverlay();
-        wrapper.appendChild(overlay);
-        card.appendChild(wrapper);
+        card.appendChild(rem);
       }
 
       return card;
