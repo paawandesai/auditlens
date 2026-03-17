@@ -23,9 +23,15 @@ PYTHON_FRAMEWORK_SIGNATURES: dict[str, dict] = {
     "scikit-learn": {"hr_relevance": 0.7, "confidence": 0.95},
     "sklearn": {"hr_relevance": 0.7, "confidence": 0.95},
     "tensorflow": {"hr_relevance": 0.5, "confidence": 0.95},
+    "tensorflow-gpu": {"hr_relevance": 0.5, "confidence": 0.95},
+    "tf-nightly": {"hr_relevance": 0.5, "confidence": 0.95},
     "torch": {"hr_relevance": 0.5, "confidence": 0.95},
     "pytorch": {"hr_relevance": 0.5, "confidence": 0.95},
+    "torchaudio": {"hr_relevance": 0.3, "confidence": 0.90},
     "keras": {"hr_relevance": 0.5, "confidence": 0.90},
+    "jax": {"hr_relevance": 0.4, "confidence": 0.90},
+    "jaxlib": {"hr_relevance": 0.4, "confidence": 0.90},
+    "flax": {"hr_relevance": 0.4, "confidence": 0.90},
     "xgboost": {"hr_relevance": 0.7, "confidence": 0.95},
     "lightgbm": {"hr_relevance": 0.7, "confidence": 0.95},
     "catboost": {"hr_relevance": 0.6, "confidence": 0.95},
@@ -39,14 +45,23 @@ PYTHON_FRAMEWORK_SIGNATURES: dict[str, dict] = {
     # LLM
     "openai": {"hr_relevance": 0.6, "confidence": 0.90},
     "anthropic": {"hr_relevance": 0.6, "confidence": 0.90},
+    "google-genai": {"hr_relevance": 0.6, "confidence": 0.90},
     "langchain": {"hr_relevance": 0.6, "confidence": 0.85},
     "langchain-core": {"hr_relevance": 0.6, "confidence": 0.85},
+    "langchain-community": {"hr_relevance": 0.6, "confidence": 0.85},
+    "langchain-openai": {"hr_relevance": 0.6, "confidence": 0.85},
+    "langchain-anthropic": {"hr_relevance": 0.6, "confidence": 0.85},
     "llama-index": {"hr_relevance": 0.5, "confidence": 0.85},
+    "llama-index-core": {"hr_relevance": 0.5, "confidence": 0.85},
     "llamaindex": {"hr_relevance": 0.5, "confidence": 0.85},
     "crewai": {"hr_relevance": 0.5, "confidence": 0.80},
     "autogen": {"hr_relevance": 0.5, "confidence": 0.80},
+    "pyautogen": {"hr_relevance": 0.5, "confidence": 0.80},
+    "autogen-agentchat": {"hr_relevance": 0.5, "confidence": 0.80},
     # CV
     "opencv-python": {"hr_relevance": 0.3, "confidence": 0.90},
+    "opencv-contrib-python": {"hr_relevance": 0.3, "confidence": 0.90},
+    "opencv-python-headless": {"hr_relevance": 0.3, "confidence": 0.90},
     "torchvision": {"hr_relevance": 0.3, "confidence": 0.90},
     "ultralytics": {"hr_relevance": 0.2, "confidence": 0.90},
     # Data processing (weaker signals)
@@ -72,12 +87,18 @@ PYTHON_FRAMEWORK_SIGNATURES: dict[str, dict] = {
     # Agent frameworks
     "semantic-kernel": {"hr_relevance": 0.5, "confidence": 0.85},
     "haystack-ai": {"hr_relevance": 0.5, "confidence": 0.85},
+    "farm-haystack": {"hr_relevance": 0.5, "confidence": 0.85},
     "dspy-ai": {"hr_relevance": 0.5, "confidence": 0.80},
+    "dspy": {"hr_relevance": 0.5, "confidence": 0.80},
     # Computer Vision (high HR relevance — face recognition = biometrics)
     "face-recognition": {"hr_relevance": 0.95, "confidence": 0.98},
+    "face_recognition": {"hr_relevance": 0.95, "confidence": 0.98},
     "deepface": {"hr_relevance": 0.95, "confidence": 0.98},
     "insightface": {"hr_relevance": 0.95, "confidence": 0.98},
     "mediapipe": {"hr_relevance": 0.7, "confidence": 0.90},
+    # AI Infrastructure
+    "huggingface-hub": {"hr_relevance": 0.4, "confidence": 0.85},
+    "huggingface_hub": {"hr_relevance": 0.4, "confidence": 0.85},
 }
 
 JS_FRAMEWORK_SIGNATURES: dict[str, dict] = {
@@ -87,15 +108,44 @@ JS_FRAMEWORK_SIGNATURES: dict[str, dict] = {
     "@anthropic-ai/sdk": {"hr_relevance": 0.6, "confidence": 0.90},
     "langchain": {"hr_relevance": 0.6, "confidence": 0.85},
     "@langchain/core": {"hr_relevance": 0.6, "confidence": 0.85},
+    "@langchain/anthropic": {"hr_relevance": 0.6, "confidence": 0.85},
+    "@langchain/community": {"hr_relevance": 0.6, "confidence": 0.85},
     "llamaindex": {"hr_relevance": 0.5, "confidence": 0.85},
     "brain.js": {"hr_relevance": 0.3, "confidence": 0.80},
     "ml5": {"hr_relevance": 0.2, "confidence": 0.75},
-    # Ported from Comply
+    # LLM Providers
     "@google/generative-ai": {"hr_relevance": 0.6, "confidence": 0.90},
+    "@google/genai": {"hr_relevance": 0.6, "confidence": 0.90},
+    "@azure/openai": {"hr_relevance": 0.6, "confidence": 0.90},
     "cohere-ai": {"hr_relevance": 0.6, "confidence": 0.90},
+    "groq-sdk": {"hr_relevance": 0.5, "confidence": 0.85},
+    "together-ai": {"hr_relevance": 0.5, "confidence": 0.85},
+    "replicate": {"hr_relevance": 0.5, "confidence": 0.85},
+    "@aws-sdk/client-bedrock-runtime": {"hr_relevance": 0.3, "confidence": 0.50},
+    "@aws-sdk/client-bedrock": {"hr_relevance": 0.3, "confidence": 0.50},
+    # Vercel AI SDK
     "@vercel/ai": {"hr_relevance": 0.5, "confidence": 0.85},
     "ai": {"hr_relevance": 0.5, "confidence": 0.80},
+    "@ai-sdk/openai": {"hr_relevance": 0.6, "confidence": 0.90},
+    "@ai-sdk/anthropic": {"hr_relevance": 0.6, "confidence": 0.90},
+    "@ai-sdk/google": {"hr_relevance": 0.6, "confidence": 0.90},
+    "@ai-sdk/mistral": {"hr_relevance": 0.6, "confidence": 0.90},
+    "@ai-sdk/amazon-bedrock": {"hr_relevance": 0.3, "confidence": 0.50},
+    "@ai-sdk/azure": {"hr_relevance": 0.6, "confidence": 0.90},
+    "@ai-sdk/cohere": {"hr_relevance": 0.6, "confidence": 0.90},
+    "@ai-sdk/groq": {"hr_relevance": 0.5, "confidence": 0.85},
+    # Agent frameworks
     "mastra": {"hr_relevance": 0.5, "confidence": 0.80},
+    "@mastra/core": {"hr_relevance": 0.5, "confidence": 0.80},
+    # NLP / Embeddings
+    "@xenova/transformers": {"hr_relevance": 0.7, "confidence": 0.90},
+    "@huggingface/transformers": {"hr_relevance": 0.7, "confidence": 0.90},
+    # AI Infrastructure
+    "@huggingface/hub": {"hr_relevance": 0.4, "confidence": 0.85},
+    "@huggingface/inference": {"hr_relevance": 0.4, "confidence": 0.85},
+    # Computer Vision
+    "@mediapipe/tasks-vision": {"hr_relevance": 0.7, "confidence": 0.90},
+    "@mediapipe/face_mesh": {"hr_relevance": 0.9, "confidence": 0.95},
 }
 
 

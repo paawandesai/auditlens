@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from app.scanners.requirements_parser import RequirementsParser
@@ -212,6 +214,58 @@ class TestNewFrameworkSignatures:
         content = '{"dependencies": {"@google/generative-ai": "^0.1"}}'
         result = parser.parse({"package.json": content})
         assert result[0].name == "@google/generative-ai"
+
+    def test_jax_ecosystem(self, parser: RequirementsParser):
+        result = parser.parse({"requirements.txt": "jax>=0.4.0\njaxlib\nflax"})
+        names = {fw.name for fw in result}
+        assert "jax" in names
+        assert "jaxlib" in names
+        assert "flax" in names
+
+    def test_huggingface_hub(self, parser: RequirementsParser):
+        result = parser.parse({"requirements.txt": "huggingface-hub>=0.20"})
+        assert result[0].name == "huggingface-hub"
+        assert result[0].hr_relevance_score == 0.4
+
+    def test_tensorflow_gpu_alias(self, parser: RequirementsParser):
+        result = parser.parse({"requirements.txt": "tensorflow-gpu==2.15"})
+        assert result[0].name == "tensorflow-gpu"
+        assert result[0].confidence == 0.95
+
+    def test_langchain_ecosystem(self, parser: RequirementsParser):
+        content = "langchain-community\nlangchain-openai\nlangchain-anthropic"
+        result = parser.parse({"requirements.txt": content})
+        names = {fw.name for fw in result}
+        assert names == {"langchain-community", "langchain-openai", "langchain-anthropic"}
+
+    def test_face_recognition_underscore(self, parser: RequirementsParser):
+        result = parser.parse({"requirements.txt": "face_recognition"})
+        assert result[0].hr_relevance_score == 0.95
+
+    def test_js_azure_openai(self, parser: RequirementsParser):
+        pkg = json.dumps({"dependencies": {"@azure/openai": "^1.0"}})
+        result = parser.parse({"package.json": pkg})
+        assert result[0].name == "@azure/openai"
+
+    def test_js_ai_sdk_providers(self, parser: RequirementsParser):
+        pkg = json.dumps({"dependencies": {
+            "@ai-sdk/openai": "^1.0",
+            "@ai-sdk/anthropic": "^1.0",
+        }})
+        result = parser.parse({"package.json": pkg})
+        names = {fw.name for fw in result}
+        assert "@ai-sdk/openai" in names
+        assert "@ai-sdk/anthropic" in names
+
+    def test_js_huggingface_packages(self, parser: RequirementsParser):
+        pkg = json.dumps({"dependencies": {
+            "@huggingface/transformers": "^3.0",
+            "@huggingface/inference": "^2.0",
+        }})
+        result = parser.parse({"package.json": pkg})
+        names = {fw.name for fw in result}
+        assert "@huggingface/transformers" in names
+        assert "@huggingface/inference" in names
 
 
 class TestMultiManifest:
