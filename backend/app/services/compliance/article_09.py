@@ -54,10 +54,19 @@ class Article09Check:
             remediation=remediation,
         )
 
+    _FAILURE_DESCRIPTIONS: dict[str, str] = {
+        "risk_assessment_exists": "no risk assessment found",
+        "failure_modes_cataloged": "no failure modes documentation",
+        "mitigation_documented": "no mitigation plan",
+    }
+
     def _describe(self, status: str, sub_checks: dict) -> str:
         if status == "PASS":
             return "Risk management system documented with failure modes and mitigation measures."
-        failures = [k.replace("_", " ") for k, v in sub_checks.items() if not v]
+        failures = [
+            self._FAILURE_DESCRIPTIONS.get(k, k.replace("_", " "))
+            for k, v in sub_checks.items() if not v
+        ]
         return f"Risk management gaps: {', '.join(failures)}."
 
     def _build_remediation(self, sub_checks: dict) -> str:

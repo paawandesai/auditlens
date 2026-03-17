@@ -124,3 +124,97 @@ class TestScanRepoEndpoint:
             json={"repository_url": "https://github.com/org/repo", "branch": "develop"},
         )
         assert response.status_code == 200
+
+
+class TestScanRepoPdfEndpoint:
+
+    @respx.mock
+    def test_returns_pdf(self, api_client):
+        base = "https://api.github.com"
+
+        respx.get(f"{base}/repos/org/repo/git/trees/main?recursive=1").mock(
+            return_value=httpx.Response(200, json=TREE_RESPONSE, headers=RATE_HEADERS)
+        )
+        respx.get(f"{base}/repos/org/repo/contents/requirements.txt?ref=main").mock(
+            return_value=httpx.Response(200, json=_b64("scikit-learn==1.4\n"), headers=RATE_HEADERS)
+        )
+        respx.get(f"{base}/repos/org/repo/contents/README.md?ref=main").mock(
+            return_value=httpx.Response(200, json=_b64("# My ML Project\n"), headers=RATE_HEADERS)
+        )
+        respx.route(method="GET", host="api.github.com").mock(
+            return_value=httpx.Response(404, json={"message": "Not Found"}, headers=RATE_HEADERS)
+        )
+
+        response = api_client.post(
+            "/api/v1/scans/repo/pdf",
+            json={"repository_url": "https://github.com/org/repo"},
+        )
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "application/pdf"
+        assert response.content[:5] == b"%PDF-"
+        assert "auditlens-" in response.headers["content-disposition"]
+
+    @respx.mock
+    def test_pdf_repo_not_found(self, api_client):
+        base = "https://api.github.com/repos/org/missing/git/trees"
+        not_found = httpx.Response(
+            404, json={"message": "Not Found"}, headers=RATE_HEADERS,
+        )
+        respx.get(f"{base}/main?recursive=1").mock(return_value=not_found)
+        respx.get(f"{base}/master?recursive=1").mock(return_value=not_found)
+
+        response = api_client.post(
+            "/api/v1/scans/repo/pdf",
+            json={"repository_url": "https://github.com/org/missing"},
+        )
+        assert response.status_code == 404
+
+
+class TestExportPlatformsEndpoint:
+
+    def test_lists_platforms(self, api_client):
+        response = api_client.get("/api/v1/scans/export/platforms")
+        assert response.status_code == 200
+        data = response.json()
+        assert "platforms" in data
+        assert "vanta" in data["platforms"]
+        assert "drata" in data["platforms"]
+        assert "secureframe" in data["platforms"]
+        assert "generic" in data["platforms"]
+
+
+class TestExportEndpoint:
+
+    @respx.mock
+    def test_vanta_export(self, api_client):
+        base = "https://api.github.com"
+        respx.get(f"{base}/repos/org/repo/git/trees/main?recursive=1").mock(
+            return_value=httpx.Response(200, json=TREE_RESPONSE, headers=RATE_HEADERS)
+        )
+        respx.get(f"{base}/repos/org/repo/contents/requirements.txt?ref=main").mock(
+            return_value=httpx.Response(200, json=_b64("scikit-learn\n"), headers=RATE_HEADERS)
+        )
+        respx.get(f"{base}/repos/org/repo/contents/README.md?ref=main").mock(
+            return_value=httpx.Response(200, json=_b64("# ML\n"), headers=RATE_HEADERS)
+        )
+        respx.route(method="GET", host="api.github.com").mock(
+            return_value=httpx.Response(404, json={"message": "Not Found"}, headers=RATE_HEADERS)
+        )
+
+        response = api_client.post(
+            "/api/v1/scans/repo/export/vanta",
+            json={"repository_url": "https://github.com/org/repo"},
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["platform"] == "vanta"
+        assert len(data["controls"]) == 7
+
+    def test_unknown_platform_returns_400(self, api_client):
+        response = api_client.post(
+            "/api/v1/scans/repo/export/unknown",
+            json={"repository_url": "https://github.com/org/repo"},
+        )
+        assert response.status_code == 400
+        assert "Unknown platform" in response.json()["detail"]

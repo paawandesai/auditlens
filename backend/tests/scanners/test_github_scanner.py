@@ -242,6 +242,132 @@ class TestScanFullPipeline:
         assert output.training_data_stats is None
 
 
+# ---------------------------------------------------------------------------
+# Manifest File Discovery
+# ---------------------------------------------------------------------------
+
+class TestFindManifestFiles:
+
+    def setup_method(self):
+        self.scanner = GitHubScanner(client=httpx.AsyncClient())
+
+    def test_finds_root_level(self):
+        tree = ["README.md", "requirements.txt", "setup.py"]
+        result = self.scanner._find_manifest_files(tree, ["requirements.txt", "setup.py"])
+        assert "requirements.txt" in result
+        assert "setup.py" in result
+
+    def test_finds_nested_manifests(self):
+        tree = [
+            "README.md",
+            "backend/requirements.txt",
+            "model/setup.py",
+            "frontend/package.json",
+        ]
+        result = self.scanner._find_manifest_files(
+            tree, ["requirements.txt", "setup.py", "package.json"]
+        )
+        assert "backend/requirements.txt" in result
+        assert "model/setup.py" in result
+        assert "frontend/package.json" in result
+
+    def test_prefers_root_level(self):
+        tree = [
+            "requirements.txt",
+            "backend/requirements.txt",
+            "model/requirements.txt",
+        ]
+        result = self.scanner._find_manifest_files(tree, ["requirements.txt"])
+        assert result[0] == "requirements.txt"  # root first
+
+    def test_caps_at_15(self):
+        tree = [f"dir{i}/requirements.txt" for i in range(20)]
+        result = self.scanner._find_manifest_files(tree, ["requirements.txt"])
+        assert len(result) == 15
+
+    def test_case_insensitive(self):
+        tree = ["REQUIREMENTS.TXT", "Setup.py"]
+        result = self.scanner._find_manifest_files(
+            tree, ["requirements.txt", "setup.py"]
+        )
+        assert len(result) == 2
+
+    def test_no_matches(self):
+        tree = ["README.md", "src/main.py"]
+        result = self.scanner._find_manifest_files(tree, ["requirements.txt"])
+        assert result == []
+
+    def test_finds_environment_yml(self):
+        tree = ["ml/environment.yml", "requirements.txt"]
+        result = self.scanner._find_manifest_files(
+            tree, ["requirements.txt", "environment.yml"]
+        )
+        assert "ml/environment.yml" in result
+
+
+# ---------------------------------------------------------------------------
+# Full Scan with Nested Manifests
+# ---------------------------------------------------------------------------
+
+class TestScanNestedManifests:
+
+    @respx.mock
+    @pytest.mark.asyncio
+    async def test_scan_discovers_nested_requirements(self):
+        base = "https://api.github.com"
+        headers = _rate_limit_headers()
+
+        tree_with_nested = {
+            "sha": "abc",
+            "tree": [
+                {"path": "README.md", "type": "blob"},
+                {"path": "backend/requirements.txt", "type": "blob"},
+                {"path": "model/setup.py", "type": "blob"},
+            ],
+            "truncated": False,
+        }
+
+        respx.get(f"{base}/repos/org/monorepo/git/trees/main?recursive=1").mock(
+            return_value=httpx.Response(200, json=tree_with_nested, headers=headers)
+        )
+
+        respx.get(f"{base}/repos/org/monorepo/contents/backend/requirements.txt?ref=main").mock(
+            return_value=httpx.Response(
+                200, json=_b64_content("torch>=2.0\ntransformers\n"), headers=headers
+            )
+        )
+
+        setup_py_content = (
+            "from setuptools import setup\n"
+            "setup(install_requires=['scikit-learn'])\n"
+        )
+        respx.get(f"{base}/repos/org/monorepo/contents/model/setup.py?ref=main").mock(
+            return_value=httpx.Response(
+                200, json=_b64_content(setup_py_content), headers=headers
+            )
+        )
+
+        respx.get(f"{base}/repos/org/monorepo/contents/README.md?ref=main").mock(
+            return_value=httpx.Response(
+                200, json=_b64_content("# Monorepo\n"), headers=headers
+            )
+        )
+
+        # Catch-all for other requests
+        respx.route(method="GET", host="api.github.com").mock(
+            return_value=httpx.Response(404, json={"message": "Not Found"}, headers=headers)
+        )
+
+        async with httpx.AsyncClient() as client:
+            scanner = GitHubScanner(client=client)
+            output = await scanner.scan("https://github.com/org/monorepo")
+
+        names = {f.name for f in output.detected_frameworks}
+        assert "torch" in names
+        assert "transformers" in names
+        assert "scikit-learn" in names
+
+
 class TestScanEdgeCases:
 
     @respx.mock

@@ -88,6 +88,13 @@ TRAINING_DATA_CONTENT_RULES: list[tuple[str, list[str]]] = [
     ("preprocessing_documented", ["preprocessing", "feature engineer"]),
 ]
 
+# AI API key variable names — presence in .env.example signals AI usage
+ENV_AI_KEY_PATTERNS: list[str] = [
+    "OPENAI_API_KEY", "ANTHROPIC_API_KEY", "COHERE_API_KEY",
+    "GOOGLE_AI_KEY", "HUGGINGFACE_TOKEN", "REPLICATE_API_TOKEN",
+    "TOGETHER_API_KEY", "MISTRAL_API_KEY", "GROQ_API_KEY",
+]
+
 
 def check_file_tree_flags(file_paths: list[str]) -> dict[str, bool]:
     """Match file paths against compliance patterns.
@@ -160,6 +167,12 @@ def extract_content_flags(contents: dict[str, str]) -> dict[str, bool | dict[str
     # Adversarial testing signal
     flags["adversarial_tested"] = any(
         kw in combined for kw in ["adversarial", "robustness test"]
+    )
+
+    # AI API key detection (from .env.example or docker-compose.yml)
+    upper_combined = "\n".join(contents.values())
+    flags["ai_api_keys_found"] = any(
+        key in upper_combined for key in ENV_AI_KEY_PATTERNS
     )
 
     return flags

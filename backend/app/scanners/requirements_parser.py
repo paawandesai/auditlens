@@ -61,6 +61,23 @@ PYTHON_FRAMEWORK_SIGNATURES: dict[str, dict] = {
     "fairlearn": {"hr_relevance": 0.95, "confidence": 0.98},
     "aif360": {"hr_relevance": 0.95, "confidence": 0.98},
     "themis-ml": {"hr_relevance": 0.9, "confidence": 0.95},
+    # LLM Providers (ported from Comply)
+    "cohere": {"hr_relevance": 0.6, "confidence": 0.90},
+    "mistralai": {"hr_relevance": 0.6, "confidence": 0.90},
+    "google-generativeai": {"hr_relevance": 0.6, "confidence": 0.90},
+    "together": {"hr_relevance": 0.5, "confidence": 0.85},
+    "groq": {"hr_relevance": 0.5, "confidence": 0.85},
+    "replicate": {"hr_relevance": 0.5, "confidence": 0.85},
+    "boto3": {"hr_relevance": 0.3, "confidence": 0.50},
+    # Agent frameworks
+    "semantic-kernel": {"hr_relevance": 0.5, "confidence": 0.85},
+    "haystack-ai": {"hr_relevance": 0.5, "confidence": 0.85},
+    "dspy-ai": {"hr_relevance": 0.5, "confidence": 0.80},
+    # Computer Vision (high HR relevance — face recognition = biometrics)
+    "face-recognition": {"hr_relevance": 0.95, "confidence": 0.98},
+    "deepface": {"hr_relevance": 0.95, "confidence": 0.98},
+    "insightface": {"hr_relevance": 0.95, "confidence": 0.98},
+    "mediapipe": {"hr_relevance": 0.7, "confidence": 0.90},
 }
 
 JS_FRAMEWORK_SIGNATURES: dict[str, dict] = {
@@ -73,6 +90,12 @@ JS_FRAMEWORK_SIGNATURES: dict[str, dict] = {
     "llamaindex": {"hr_relevance": 0.5, "confidence": 0.85},
     "brain.js": {"hr_relevance": 0.3, "confidence": 0.80},
     "ml5": {"hr_relevance": 0.2, "confidence": 0.75},
+    # Ported from Comply
+    "@google/generative-ai": {"hr_relevance": 0.6, "confidence": 0.90},
+    "cohere-ai": {"hr_relevance": 0.6, "confidence": 0.90},
+    "@vercel/ai": {"hr_relevance": 0.5, "confidence": 0.85},
+    "ai": {"hr_relevance": 0.5, "confidence": 0.80},
+    "mastra": {"hr_relevance": 0.5, "confidence": 0.80},
 }
 
 
@@ -98,6 +121,8 @@ class RequirementsParser:
             "pyproject.toml": self._parse_pyproject_toml,
             "Pipfile": self._parse_pipfile,
             "setup.cfg": self._parse_setup_cfg,
+            "setup.py": self._parse_setup_py,
+            "environment.yml": self._parse_environment_yml,
         }
 
         for filename, content in files.items():
@@ -249,4 +274,89 @@ class RequirementsParser:
                                 confidence=sig["confidence"],
                                 hr_relevance_score=sig["hr_relevance"],
                             ))
+        return detected
+
+    def _parse_setup_py(self, content: str) -> list[DetectedFramework]:
+        """Extract install_requires from setup.py using regex.
+
+        Handles the common pattern: install_requires=["pkg1", "pkg2>=1.0"]
+        Won't catch dynamic setup.py files that compute deps at runtime.
+        """
+        detected: list[DetectedFramework] = []
+
+        # Match install_requires=[...] across multiple lines
+        match = re.search(
+            r"install_requires\s*=\s*\[([^\]]*)\]", content, re.DOTALL
+        )
+        if not match:
+            return detected
+
+        deps_block = match.group(1)
+        dep_strings = re.findall(r"['\"]([^'\"]+)['\"]", deps_block)
+
+        for dep in dep_strings:
+            pkg_match = re.match(r"^([a-zA-Z0-9_-]+)", dep)
+            if not pkg_match:
+                continue
+            pkg_name = pkg_match.group(1).lower()
+            sig = PYTHON_FRAMEWORK_SIGNATURES.get(pkg_name)
+            if sig:
+                detected.append(DetectedFramework(
+                    name=pkg_name,
+                    version=None,
+                    confidence=sig["confidence"],
+                    hr_relevance_score=sig["hr_relevance"],
+                ))
+        return detected
+
+    def _parse_environment_yml(self, content: str) -> list[DetectedFramework]:
+        """Extract pip and conda dependencies from environment.yml.
+
+        Parses both top-level conda deps and nested pip deps:
+          dependencies:
+            - numpy=1.21
+            - pip:
+              - scikit-learn>=1.0
+        """
+        detected: list[DetectedFramework] = []
+        in_dependencies = False
+        in_pip = False
+
+        for line in content.splitlines():
+            stripped = line.strip()
+
+            if stripped.startswith("dependencies:"):
+                in_dependencies = True
+                continue
+
+            if in_dependencies and stripped and not stripped.startswith("-") and ":" in stripped:
+                # New top-level YAML key — exit dependencies block
+                if not stripped.startswith("- pip"):
+                    in_dependencies = False
+                    in_pip = False
+                    continue
+
+            if not in_dependencies:
+                continue
+
+            if stripped == "- pip:":
+                in_pip = True
+                continue
+
+            if stripped.startswith("- "):
+                dep_str = stripped[2:].strip()
+                # Extract package name (before version specifiers)
+                pkg_match = re.match(r"^([a-zA-Z0-9_-]+)", dep_str)
+                if not pkg_match:
+                    continue
+                pkg_name = pkg_match.group(1).lower()
+                sig = PYTHON_FRAMEWORK_SIGNATURES.get(pkg_name)
+                if sig:
+                    detected.append(DetectedFramework(
+                        name=pkg_name,
+                        version=None,
+                        confidence=sig["confidence"],
+                        hr_relevance_score=sig["hr_relevance"],
+                    ))
+
         return detected

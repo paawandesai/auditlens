@@ -1,5 +1,12 @@
 pyproject.toml
 app/__init__.py
+app/main.py
+app/routers/__init__.py
+app/routers/scans.py
+app/scanners/__init__.py
+app/scanners/content_analyzer.py
+app/scanners/github_scanner.py
+app/scanners/requirements_parser.py
 app/schemas/__init__.py
 app/schemas/compliance.py
 app/schemas/scanner.py

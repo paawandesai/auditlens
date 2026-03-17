@@ -54,13 +54,22 @@ class Article13Check:
             remediation=remediation,
         )
 
+    _FAILURE_DESCRIPTIONS: dict[str, str] = {
+        "explainability_available": "no explainability tools (SHAP/LIME) found",
+        "feature_importance_documented": "no feature importance documentation",
+        "user_instructions_provided": "no user instructions or model card",
+    }
+
     def _describe(self, status: str, sub_checks: dict) -> str:
         if status == "PASS":
             return (
                 "Transparency requirements met: explainability,"
                 " feature importance, and user instructions available."
             )
-        failures = [k.replace("_", " ") for k, v in sub_checks.items() if not v]
+        failures = [
+            self._FAILURE_DESCRIPTIONS.get(k, k.replace("_", " "))
+            for k, v in sub_checks.items() if not v
+        ]
         return f"Transparency gaps: {', '.join(failures)}."
 
     def _build_remediation(self, sub_checks: dict) -> str:

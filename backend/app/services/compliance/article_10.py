@@ -122,6 +122,13 @@ class Article10Check:
 
         return True, None
 
+    _FAILURE_DESCRIPTIONS: dict[str, str] = {
+        "provenance_documented": "no data provenance documentation",
+        "class_balance_ok": "no class balance data or imbalanced classes",
+        "data_quality_metrics_logged": "no data quality metrics logged",
+        "preprocessing_documented": "no preprocessing documentation",
+    }
+
     def _build_evidence_description(
         self, status: str, sub_checks: dict[str, bool]
     ) -> str:
@@ -134,7 +141,7 @@ class Article10Check:
             )
 
         failures = [
-            name.replace("_", " ")
+            self._FAILURE_DESCRIPTIONS.get(name, name.replace("_", " "))
             for name, val in sub_checks.items()
             if not val
         ]

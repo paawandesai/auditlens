@@ -223,6 +223,23 @@ class TestExtractContentFlags:
         assert flags["has_explainability"] is True
         assert flags["has_feature_importance_docs"] is True
 
+    def test_env_api_key_openai(self):
+        flags = extract_content_flags({".env.example": "OPENAI_API_KEY=sk-xxx"})
+        assert flags["ai_api_keys_found"] is True
+
+    def test_env_api_key_anthropic(self):
+        flags = extract_content_flags({".env.example": "ANTHROPIC_API_KEY=\nDATABASE_URL=pg://..."})
+        assert flags["ai_api_keys_found"] is True
+
+    def test_env_no_ai_keys(self):
+        flags = extract_content_flags({".env.example": "DATABASE_URL=pg://...\nSECRET_KEY=abc"})
+        assert flags["ai_api_keys_found"] is False
+
+    def test_env_multiple_ai_keys(self):
+        content = "OPENAI_API_KEY=\nANTHROPIC_API_KEY=\nGROQ_API_KEY="
+        flags = extract_content_flags({".env.example": content})
+        assert flags["ai_api_keys_found"] is True
+
     def test_combined_signals(self):
         content = {
             "README.md": (

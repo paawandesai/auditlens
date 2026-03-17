@@ -32,13 +32,13 @@ MAX_CONCURRENT_FETCHES = 5
 # Files to fetch for content analysis (README + common doc files)
 CONTENT_FILES: list[str] = [
     "README.md", "readme.md", "README.rst", "README",
-    "docs/README.md",
+    "docs/README.md", ".env.example",
 ]
 
 # Manifest files to fetch for dependency detection
 MANIFEST_FILES: list[str] = [
     "requirements.txt", "pyproject.toml", "package.json",
-    "Pipfile", "setup.cfg",
+    "Pipfile", "setup.cfg", "setup.py", "environment.yml",
 ]
 
 
@@ -84,8 +84,8 @@ class GitHubScanner:
                     raise
             tree_flags = check_file_tree_flags(file_paths)
 
-            # Pass 2: Fetch and parse manifests
-            manifest_files = self._select_existing_files(file_paths, MANIFEST_FILES)
+            # Pass 2: Fetch and parse manifests (search at any depth)
+            manifest_files = self._find_manifest_files(file_paths, MANIFEST_FILES)
             manifest_contents = await self._fetch_files(owner, repo, branch, manifest_files)
             detected_frameworks = self._parser.parse(manifest_contents)
 
@@ -193,6 +193,23 @@ class GitHubScanner:
 
         response.raise_for_status()
         return response.json()
+
+    def _find_manifest_files(
+        self, tree_paths: list[str], target_names: list[str]
+    ) -> list[str]:
+        """Find manifest files at any depth, preferring root-level.
+
+        Unlike _select_existing_files which does exact path matching,
+        this matches by filename regardless of directory depth.
+        """
+        target_set = {t.lower() for t in target_names}
+        matches = [
+            p for p in tree_paths
+            if p.rsplit("/", 1)[-1].lower() in target_set
+        ]
+        # Sort: root-level first, then by depth
+        matches.sort(key=lambda p: p.count("/"))
+        return matches[:15]  # Cap to avoid excessive API calls
 
     def _select_existing_files(
         self, tree_paths: list[str], target_files: list[str]

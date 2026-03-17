@@ -105,6 +105,115 @@ class TestPipfile:
         assert "pytest" not in names
 
 
+class TestSetupPy:
+
+    def test_detects_torch(self, parser: RequirementsParser):
+        content = (
+            "from setuptools import setup\n"
+            "setup(\n"
+            "    name='my-model',\n"
+            "    install_requires=[\n"
+            "        'torch>=2.0',\n"
+            "        'transformers',\n"
+            "        'requests',\n"
+            "    ],\n"
+            ")\n"
+        )
+        result = parser.parse({"setup.py": content})
+        names = {f.name for f in result}
+        assert "torch" in names
+        assert "transformers" in names
+        assert "requests" not in names
+
+    def test_inline_install_requires(self, parser: RequirementsParser):
+        content = 'setup(install_requires=["scikit-learn", "pandas"])'
+        result = parser.parse({"setup.py": content})
+        names = {f.name for f in result}
+        assert "scikit-learn" in names
+        assert "pandas" in names
+
+    def test_empty_install_requires(self, parser: RequirementsParser):
+        content = "setup(install_requires=[])"
+        result = parser.parse({"setup.py": content})
+        assert result == []
+
+    def test_no_install_requires(self, parser: RequirementsParser):
+        content = "setup(name='foo')"
+        result = parser.parse({"setup.py": content})
+        assert result == []
+
+    def test_nested_path_setup_py(self, parser: RequirementsParser):
+        content = 'setup(install_requires=["torch"])'
+        result = parser.parse({"model/setup.py": content})
+        names = {f.name for f in result}
+        assert "torch" in names
+
+
+class TestEnvironmentYml:
+
+    def test_detects_conda_deps(self, parser: RequirementsParser):
+        content = (
+            "name: ml-env\n"
+            "dependencies:\n"
+            "  - numpy=1.21\n"
+            "  - scikit-learn=1.4\n"
+        )
+        result = parser.parse({"environment.yml": content})
+        names = {f.name for f in result}
+        assert "numpy" in names
+        assert "scikit-learn" in names
+
+    def test_detects_pip_deps(self, parser: RequirementsParser):
+        content = (
+            "name: ml-env\n"
+            "dependencies:\n"
+            "  - python=3.11\n"
+            "  - pip:\n"
+            "    - torch>=2.0\n"
+            "    - transformers\n"
+        )
+        result = parser.parse({"environment.yml": content})
+        names = {f.name for f in result}
+        assert "torch" in names
+        assert "transformers" in names
+
+    def test_empty_dependencies(self, parser: RequirementsParser):
+        content = "name: empty\ndependencies:\nchannels:\n  - defaults\n"
+        result = parser.parse({"environment.yml": content})
+        assert result == []
+
+
+class TestNewFrameworkSignatures:
+
+    def test_cohere(self, parser: RequirementsParser):
+        result = parser.parse({"requirements.txt": "cohere\n"})
+        assert len(result) == 1
+        assert result[0].name == "cohere"
+
+    def test_face_recognition_high_hr(self, parser: RequirementsParser):
+        result = parser.parse({"requirements.txt": "face-recognition\n"})
+        assert result[0].hr_relevance_score == 0.95
+
+    def test_deepface(self, parser: RequirementsParser):
+        result = parser.parse({"requirements.txt": "deepface\n"})
+        assert result[0].name == "deepface"
+        assert result[0].hr_relevance_score == 0.95
+
+    def test_google_generativeai(self, parser: RequirementsParser):
+        result = parser.parse({"requirements.txt": "google-generativeai\n"})
+        assert result[0].name == "google-generativeai"
+
+    def test_js_vercel_ai(self, parser: RequirementsParser):
+        content = '{"dependencies": {"@vercel/ai": "^3.0"}}'
+        result = parser.parse({"package.json": content})
+        assert result[0].name == "@vercel/ai"
+
+    def test_js_google_genai(self, parser: RequirementsParser):
+        content = '{"dependencies": {"@google/generative-ai": "^0.1"}}'
+        result = parser.parse({"package.json": content})
+        assert result[0].name == "@google/generative-ai"
+
+
 class TestMultiManifest:
 
     def test_deduplicates_across_files(self, parser: RequirementsParser):
