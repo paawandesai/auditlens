@@ -69,10 +69,26 @@
       <!-- Article Cards -->
       <div id="article-cards" class="space-y-4"></div>
 
-      <!-- CTA Banner — swap back to Stripe upgrade when Priority 5 ships -->
-      <div class="bg-gray-900 border border-gray-700 rounded-lg p-6 text-center">
-        <p class="text-lg font-semibold mb-2">Audit-ready PDF export coming soon</p>
-        <p class="text-gray-400 text-sm">Download a compliance evidence PDF formatted for auditors and GRC platforms.</p>
+      <!-- Export Actions -->
+      <div class="bg-gray-900 border border-gray-700 rounded-lg p-6">
+        <div class="flex items-center justify-center gap-4 flex-wrap">
+          <!-- PDF Download -->
+          <button id="download-pdf-btn"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            Download PDF Report
+          </button>
+          <!-- GRC Export -->
+          <div class="flex items-center gap-2">
+            <select id="grc-platform"
+              class="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5 text-gray-200 text-sm">
+              <option value="">GRC Export...</option>
+            </select>
+            <button id="export-grc-btn"
+              class="bg-gray-700 hover:bg-gray-600 text-white font-semibold px-4 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              Export
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </main>
@@ -126,10 +142,13 @@
     const show = (id) => $(id).classList.remove('hidden');
     const hide = (id) => $(id).classList.add('hidden');
 
+    let lastScannedUrl = '';
+
     $('scan-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       const url = $('repo-url').value.trim();
       if (!url) return;
+      lastScannedUrl = url;
 
       // Reset UI
       hide('results');
@@ -276,6 +295,79 @@
       `;
       return overlay;
     }
+
+    // --- PDF Download ---
+    $('download-pdf-btn').addEventListener('click', async () => {
+      if (!lastScannedUrl) return;
+      const btn = $('download-pdf-btn');
+      btn.disabled = true;
+      btn.textContent = 'Generating...';
+      try {
+        const res = await fetch(`${API_URL}/api/v1/scans/repo/pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repository_url: lastScannedUrl }),
+        });
+        if (!res.ok) throw new Error('PDF generation failed');
+        const blob = await res.blob();
+        const disposition = res.headers.get('content-disposition') || '';
+        const match = disposition.match(/filename=([^\s;]+)/);
+        const filename = match ? match[1] : 'auditlens-report.pdf';
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } catch (err) {
+        alert('Failed to generate PDF. Please try again.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Download PDF Report';
+      }
+    });
+
+    // --- GRC Platform Dropdown ---
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/v1/scans/export/platforms`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const select = $('grc-platform');
+        for (const p of data.platforms) {
+          const opt = document.createElement('option');
+          opt.value = p;
+          opt.textContent = p.charAt(0).toUpperCase() + p.slice(1);
+          select.appendChild(opt);
+        }
+      } catch { /* silent — dropdown stays empty if backend unreachable */ }
+    })();
+
+    // --- GRC Export ---
+    $('export-grc-btn').addEventListener('click', async () => {
+      const platform = $('grc-platform').value;
+      if (!platform || !lastScannedUrl) return;
+      const btn = $('export-grc-btn');
+      btn.disabled = true;
+      try {
+        const res = await fetch(`${API_URL}/api/v1/scans/repo/export/${platform}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repository_url: lastScannedUrl }),
+        });
+        if (!res.ok) throw new Error('Export failed');
+        const data = await res.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `auditlens-${platform}-export.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } catch (err) {
+        alert('Failed to export. Please try again.');
+      } finally {
+        btn.disabled = false;
+      }
+    });
   </script>
 </body>
 </html>
