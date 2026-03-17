@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: auditlens-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -e .
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: GITHUB_TOKEN
+        sync: false
+      - key: AUDITLENS_ALLOWED_ORIGINS
+        sync: false
+      - key: AUDITLENS_ENVIRONMENT
+        value: production
+      - key: PYTHON_VERSION
+        value: "3.11"

@@ -3,3 +3,19 @@ CLAUDE.md
 sprint_plan.md
 tmp/
 .claude/rules/
+
+# Secrets and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+dist/
+build/

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import json
+import os
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -13,9 +16,15 @@ app = FastAPI(
     description="Scan GitHub repositories for AI/ML compliance against EU AI Act.",
 )
 
+_default_origins = ["http://localhost:3000", "http://localhost:5173"]
+_origins_env = os.environ.get("AUDITLENS_ALLOWED_ORIGINS", "")
+allowed_origins: list[str] = (
+    json.loads(_origins_env) if _origins_env else _default_origins
+)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Tighten in production
+    allow_origins=allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
