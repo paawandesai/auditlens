@@ -70,22 +70,25 @@
       <div id="article-cards" class="space-y-4"></div>
 
       <!-- Export Actions -->
-      <div class="bg-gray-900 border border-gray-700 rounded-lg p-6">
-        <div class="flex items-center justify-center gap-4 flex-wrap">
-          <!-- PDF Download -->
+      <div class="bg-gray-900 border border-gray-700 rounded-lg p-6 space-y-4">
+        <!-- PDF Download -->
+        <div>
+          <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">Audit Report</h3>
           <button id="download-pdf-btn"
             class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             Download PDF Report
           </button>
-          <!-- GRC Export -->
+        </div>
+        <!-- GRC Export -->
+        <div class="border-t border-gray-700 pt-4">
+          <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">GRC Platform Export</h3>
           <div class="flex items-center gap-2">
             <select id="grc-platform"
               class="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5 text-gray-200 text-sm">
-              <option value="">GRC Export...</option>
             </select>
             <button id="export-grc-btn"
-              class="bg-gray-700 hover:bg-gray-600 text-white font-semibold px-4 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-              Export
+              class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              Export JSON
             </button>
           </div>
         </div>
