@@ -193,3 +193,47 @@ class TestFlask:
         """With no AI detected, all checks fail — but that's expected."""
         _, assessment = await _scan_and_assess(self.REPO)
         assert assessment.summary.overall_status == "NON_COMPLIANT"
+
+
+# ---------------------------------------------------------------------------
+# Golden Repo 5: vercel/ai-chatbot — JS/TS AI project (package.json path)
+# ---------------------------------------------------------------------------
+# Next.js chatbot using Vercel AI SDK. Tests the JavaScript framework detection
+# path (package.json parsing) — our other 4 golden repos are Python.
+# Expected: AI frameworks detected from package.json, all compliance checks FAIL
+# (no compliance docs), zero false-positive Python framework detections.
+
+class TestVercelAIChatbot:
+    REPO = "https://github.com/vercel/ai-chatbot"
+
+    @pytest.mark.asyncio
+    async def test_js_frameworks_detected(self):
+        """Should detect AI SDK packages from package.json."""
+        output, _ = await _scan_and_assess(self.REPO)
+        names = {f.name for f in output.detected_frameworks}
+        assert len(names) >= 1, f"Expected 1+ JS AI frameworks, got: {names}"
+        # The 'ai' package (Vercel AI SDK) should always be present
+        assert "ai" in names, f"Expected 'ai' in detected frameworks: {names}"
+
+    @pytest.mark.asyncio
+    async def test_no_python_false_positives(self):
+        """A JS-only repo should not detect Python ML frameworks."""
+        output, _ = await _scan_and_assess(self.REPO)
+        python_ml = {"scikit-learn", "tensorflow", "pytorch", "keras", "pandas",
+                     "numpy", "xgboost", "lightgbm", "transformers"}
+        detected = {f.name for f in output.detected_frameworks}
+        false_positives = detected & python_ml
+        assert len(false_positives) == 0, f"Python false positives: {false_positives}"
+
+    @pytest.mark.asyncio
+    async def test_all_articles_fail(self):
+        """No compliance docs → all articles should FAIL."""
+        _, assessment = await _scan_and_assess(self.REPO)
+        checks = _check_map(assessment)
+        for rule_id, check in checks.items():
+            assert check.status == "FAIL", f"{rule_id} expected FAIL, got {check.status}"
+
+    @pytest.mark.asyncio
+    async def test_overall_non_compliant(self):
+        _, assessment = await _scan_and_assess(self.REPO)
+        assert assessment.summary.overall_status == "NON_COMPLIANT"
