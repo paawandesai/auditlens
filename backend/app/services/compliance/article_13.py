@@ -27,7 +27,7 @@ class Article13Check:
     def evaluate(self, scanner_output: ScannerOutput) -> ComplianceCheck:
         explainability = scanner_output.has_explainability
         feature_importance = scanner_output.has_feature_importance_docs
-        user_instructions = scanner_output.has_model_card
+        user_instructions = scanner_output.has_user_instructions or scanner_output.has_model_card
 
         sub_checks = {
             "explainability_available": explainability,

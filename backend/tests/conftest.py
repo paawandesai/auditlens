@@ -4,6 +4,21 @@ from __future__ import annotations
 
 import pytest
 
+
+def pytest_addoption(parser):
+    parser.addoption(
+        "--run-golden", action="store_true", default=False,
+        help="Run golden repo tests (hits live GitHub API)",
+    )
+
+
+def pytest_collection_modifyitems(config, items):
+    if not config.getoption("--run-golden"):
+        skip = pytest.mark.skip(reason="Need --run-golden to run")
+        for item in items:
+            if "golden" in item.keywords:
+                item.add_marker(skip)
+
 from app.schemas.scanner import (
     CodeSignal,
     DetectedFramework,
@@ -55,6 +70,7 @@ def fully_compliant_scanner_output() -> ScannerOutput:
         has_escalation_docs=True,
         has_failure_modes_doc=True,
         has_mitigation_plan=True,
+        has_user_instructions=True,
         training_data_stats=TrainingDataStats(
             provenance_documented=True,
             class_balance={"gender": {"male": 52, "female": 48}},

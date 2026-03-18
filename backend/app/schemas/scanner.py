@@ -73,6 +73,7 @@ class ScannerOutput(BaseModel):
     has_escalation_docs: bool = False
     has_failure_modes_doc: bool = False
     has_mitigation_plan: bool = False
+    has_user_instructions: bool = False
 
     # Typed structured data from scanner analysis
     training_data_stats: TrainingDataStats | None = None

@@ -42,6 +42,7 @@ README_CONTENT = (
     "Uses SHAP for explainability.\n"
     "Human review is required for all predictions.\n"
     "Override mechanism available.\n"
+    "Escalation procedures for edge cases.\n"
     "Adversarial testing is performed.\n"
     "Data source: internal HR database.\n"
     "Preprocessing steps documented.\n"
@@ -206,8 +207,8 @@ class TestScanFullPipeline:
         assert output.has_mitigation_plan is True
         assert output.has_logging_config is True
 
-        # Verify inferred flags
-        assert output.has_escalation_docs is True  # inferred from human_oversight
+        # Verify content-detected flags
+        assert output.has_escalation_docs is True  # detected from "escalation" keyword
 
         # Verify frameworks detected
         names = {f.name for f in output.detected_frameworks}

@@ -68,6 +68,10 @@ CONTENT_RULES: list[tuple[str, list[str]]] = [
     ("has_override_mechanism", [
         "override", "kill_switch", "kill switch",
     ]),
+    ("has_escalation_docs", [
+        "escalat", "stop button", "halt the system", "interrupt the system",
+        "emergency stop", "safe state",
+    ]),
     ("has_feature_importance_docs", [
         "feature importance",
     ]),

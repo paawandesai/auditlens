@@ -2,7 +2,7 @@
 
 Sub-checks:
 1. provenance_documented — training data sources documented
-2. class_balance_ok — protected attributes within threshold
+2. bias_examined — protected attributes within threshold
 3. data_quality_metrics_logged — quality metrics exist
 4. preprocessing_documented — data preprocessing steps recorded
 """
@@ -45,7 +45,7 @@ class TestArticle10AllPass:
         result = check.evaluate(fully_compliant_scanner_output)
         assert result.status == "PASS"
         assert result.details["provenance_documented"] is True
-        assert result.details["class_balance_ok"] is True
+        assert result.details["bias_examined"] is True
         assert result.details["data_quality_metrics_logged"] is True
         assert result.details["preprocessing_documented"] is True
         assert result.remediation is None
@@ -60,7 +60,7 @@ class TestArticle10AllFail:
         result = check.evaluate(non_compliant_scanner_output)
         assert result.status == "FAIL"
         assert result.details["provenance_documented"] is False
-        assert result.details["class_balance_ok"] is False
+        assert result.details["bias_examined"] is False
         assert result.details["data_quality_metrics_logged"] is False
         assert result.details["preprocessing_documented"] is False
         assert result.remediation is not None
@@ -93,7 +93,7 @@ class TestArticle10ClassBalance:
         self, check: Article10Check, minimal_scanner_output: ScannerOutput
     ) -> None:
         result = check.evaluate(minimal_scanner_output)
-        assert result.details["class_balance_ok"] is False
+        assert result.details["bias_examined"] is False
 
     def test_balanced_data_passes(self, check: Article10Check) -> None:
         output = ScannerOutput(
@@ -107,7 +107,7 @@ class TestArticle10ClassBalance:
             ),
         )
         result = check.evaluate(output)
-        assert result.details["class_balance_ok"] is True
+        assert result.details["bias_examined"] is True
 
     def test_severely_imbalanced_data_fails(self, check: Article10Check) -> None:
         output = ScannerOutput(
@@ -121,11 +121,12 @@ class TestArticle10ClassBalance:
             ),
         )
         result = check.evaluate(output)
-        assert result.details["class_balance_ok"] is False
+        assert result.details["bias_examined"] is False
         imbalance = result.details.get("imbalance_details", {})
         assert "gender" in str(imbalance)
 
-    def test_missing_class_balance_key_fails(self, check: Article10Check) -> None:
+    def test_missing_class_balance_no_docs_fails(self, check: Article10Check) -> None:
+        """No class balance data AND no data documentation → fail."""
         output = ScannerOutput(
             repo_url="https://example.com/repo",
             training_data_stats=TrainingDataStats(
@@ -135,10 +136,24 @@ class TestArticle10ClassBalance:
             ),
         )
         result = check.evaluate(output)
-        assert result.details["class_balance_ok"] is False
+        assert result.details["bias_examined"] is False
+
+    def test_missing_class_balance_with_docs_passes(self, check: Article10Check) -> None:
+        """No class balance data BUT bias/data documentation exists → pass."""
+        output = ScannerOutput(
+            repo_url="https://example.com/repo",
+            has_data_documentation=True,
+            training_data_stats=TrainingDataStats(
+                provenance_documented=True,
+                quality_metrics_logged=True,
+                preprocessing_documented=True,
+            ),
+        )
+        result = check.evaluate(output)
+        assert result.details["bias_examined"] is True
 
     def test_multiple_protected_attributes(self, check: Article10Check) -> None:
-        """If any protected attribute is imbalanced, class_balance_ok is False."""
+        """If any protected attribute is imbalanced, bias_examined is False."""
         output = ScannerOutput(
             repo_url="https://example.com/repo",
             has_data_documentation=True,
@@ -153,7 +168,7 @@ class TestArticle10ClassBalance:
             ),
         )
         result = check.evaluate(output)
-        assert result.details["class_balance_ok"] is False
+        assert result.details["bias_examined"] is False
 
 
 class TestArticle10EvidenceFormat:

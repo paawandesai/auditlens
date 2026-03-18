@@ -6,14 +6,14 @@ free of errors and complete."
 
 Sub-checks:
 1. provenance_documented — training data sources are documented
-2. class_balance_ok — protected attributes within acceptable threshold
+2. bias_examined — bias analysis conducted per Art 10.2(f-g)
 3. data_quality_metrics_logged — quality metrics exist and are recorded
 4. preprocessing_documented — data preprocessing steps are recorded
 
-Threshold decision: Class balance uses a 60/40 split threshold. Any protected
-attribute with a worse ratio than 60/40 is flagged as imbalanced. This aligns
-with the "sufficiently representative" requirement without being so strict
-that legitimate datasets are flagged.
+Bias examination passes if: bias/fairness report exists, OR class balance data
+is within the 60/40 threshold. Fails if: no bias analysis at all, or data
+shows imbalance > 60/40. This avoids false-FAILing repos that have done bias
+work but don't publish raw class statistics.
 """
 
 from __future__ import annotations
@@ -38,13 +38,13 @@ class Article10Check:
         stats = scanner_output.training_data_stats or TrainingDataStats()
 
         provenance = self._check_provenance(scanner_output, stats)
-        balance, imbalance_details = self._check_class_balance(stats)
+        bias_examined, imbalance_details = self._check_bias_examination(scanner_output, stats)
         quality = stats.quality_metrics_logged
         preprocessing = stats.preprocessing_documented
 
         sub_checks: dict[str, bool] = {
             "provenance_documented": provenance,
-            "class_balance_ok": balance,
+            "bias_examined": bias_examined,
             "data_quality_metrics_logged": quality,
             "preprocessing_documented": preprocessing,
         }
@@ -60,7 +60,7 @@ class Article10Check:
             status = "PARTIAL"
 
         remediation = self._build_remediation(
-            provenance, balance, quality, preprocessing, imbalance_details
+            provenance, bias_examined, quality, preprocessing, imbalance_details
         )
 
         # Keep sub_checks strictly dict[str, bool]; imbalance_details goes separately
@@ -90,41 +90,51 @@ class Article10Check:
         """Check if training data provenance is documented."""
         return stats.provenance_documented or scanner_output.has_data_documentation
 
-    def _check_class_balance(
-        self, stats: TrainingDataStats
+    def _check_bias_examination(
+        self, scanner_output: ScannerOutput, stats: TrainingDataStats
     ) -> tuple[bool, dict | None]:
-        """Check if protected attributes are within acceptable balance threshold.
+        """Check if bias has been examined per Art 10.2(f-g).
 
-        Returns (is_balanced, imbalance_details_or_none).
+        Pass if: bias/fairness report exists OR class balance data is within threshold.
+        Fail if: no bias analysis found at all, or data shows imbalance > threshold.
+
+        Returns (bias_examined, imbalance_details_or_none).
         """
         class_balance = stats.class_balance
-        if not class_balance:
-            return False, None
 
-        for attribute, distribution in class_balance.items():
-            if len(distribution) < 2:
-                continue
+        # If class balance data is provided, validate it
+        if class_balance:
+            for attribute, distribution in class_balance.items():
+                if len(distribution) < 2:
+                    continue
 
-            values = list(distribution.values())
-            total = sum(values)
-            if total == 0:
-                continue
+                values = list(distribution.values())
+                total = sum(values)
+                if total == 0:
+                    continue
 
-            max_pct = (max(values) / total) * 100
+                max_pct = (max(values) / total) * 100
 
-            if max_pct > CLASS_BALANCE_THRESHOLD:
-                majority_key = max(distribution, key=distribution.get)  # type: ignore[arg-type]
-                return False, {
-                    "attribute": attribute,
-                    "ratio": f"{round(max_pct)}/{round(100 - max_pct)}",
-                    "majority_class": majority_key,
-                }
+                if max_pct > CLASS_BALANCE_THRESHOLD:
+                    majority_key = max(distribution, key=distribution.get)  # type: ignore[arg-type]
+                    return False, {
+                        "attribute": attribute,
+                        "ratio": f"{round(max_pct)}/{round(100 - max_pct)}",
+                        "majority_class": majority_key,
+                    }
+            # Class balance data exists and is within threshold
+            return True, None
 
-        return True, None
+        # No class balance data — check if bias analysis files exist
+        # (scanner sets has_data_documentation from bias_report*/fairness_report* files)
+        if scanner_output.has_data_documentation:
+            return True, None
+
+        return False, None
 
     _FAILURE_DESCRIPTIONS: dict[str, str] = {
         "provenance_documented": "no data provenance documentation",
-        "class_balance_ok": "no class balance data or imbalanced classes",
+        "bias_examined": "no bias analysis or fairness report found",
         "data_quality_metrics_logged": "no data quality metrics logged",
         "preprocessing_documented": "no preprocessing documentation",
     }
@@ -136,7 +146,7 @@ class Article10Check:
         if status == "PASS":
             return (
                 "Training data governance requirements satisfied:"
-                " provenance documented, class balance within thresholds,"
+                " provenance documented, bias analysis conducted,"
                 " quality metrics logged, preprocessing documented."
             )
 
@@ -150,7 +160,7 @@ class Article10Check:
     def _build_remediation(
         self,
         provenance: bool,
-        balance: bool,
+        bias_examined: bool,
         quality: bool,
         preprocessing: bool,
         imbalance_details: dict | None,
@@ -163,7 +173,7 @@ class Article10Check:
                 "Document training data sources, provenance chain,"
                 " and collection methodology."
             )
-        if not balance:
+        if not bias_examined:
             if imbalance_details:
                 attr = imbalance_details["attribute"]
                 ratio = imbalance_details["ratio"]
@@ -173,8 +183,8 @@ class Article10Check:
                 )
             else:
                 actions.append(
-                    "Provide class balance statistics for protected"
-                    " attributes in training data."
+                    "Conduct and document a bias analysis examining protected"
+                    " attributes for representativeness per Art 10.2(f-g)."
                 )
         if not quality:
             actions.append(

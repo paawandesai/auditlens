@@ -254,10 +254,13 @@ class GitHubScanner:
         for field in bool_fields:
             merged[field] = bool(tree_flags.get(field)) or bool(content_flags.get(field))
 
-        # Inferred flags
-        merged["has_escalation_docs"] = merged.get("has_human_oversight_docs", False)
+        # has_escalation_docs from content rules (not inferred from oversight docs)
+        merged["has_escalation_docs"] = bool(content_flags.get("has_escalation_docs"))
 
-        # User instructions contribute to model_card signal
+        # User instructions detected from file tree or content
+        merged["has_user_instructions"] = bool(tree_flags.get("user_instructions_found"))
+
+        # User instructions also contribute to model_card signal (backward compat)
         if tree_flags.get("user_instructions_found"):
             merged["has_model_card"] = True
 
