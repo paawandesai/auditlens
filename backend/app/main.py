@@ -18,9 +18,10 @@ app = FastAPI(
 
 _default_origins = ["http://localhost:3000", "http://localhost:5173"]
 _origins_env = os.environ.get("AUDITLENS_ALLOWED_ORIGINS", "")
-allowed_origins: list[str] = (
-    json.loads(_origins_env) if _origins_env else _default_origins
-)
+try:
+    allowed_origins: list[str] = json.loads(_origins_env) if _origins_env.strip() else _default_origins
+except (json.JSONDecodeError, TypeError):
+    allowed_origins = _default_origins
 
 app.add_middleware(
     CORSMiddleware,
