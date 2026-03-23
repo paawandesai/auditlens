@@ -7,12 +7,15 @@ Sub-checks:
 1. logging_configured — logging/monitoring infrastructure exists
 2. model_versioned — model versioning is in place
 3. audit_trail_exists — audit trail for decisions exists
+4. risk_situation_logging — logging of events identifying risk situations [Art. 12(2)(a)]
+5. input_data_recording — recording of input data [Art. 12(3)(c)]
 """
 
 from __future__ import annotations
 
 from app.schemas.compliance import CheckEvidence, ComplianceCheck, SeverityLiteral
 from app.schemas.scanner import ScannerOutput
+from app.services.compliance.citations import ART_12
 
 
 class Article12Check:
@@ -27,15 +30,20 @@ class Article12Check:
         logging = scanner_output.has_logging_config
         versioning = scanner_output.has_versioning
         audit_trail = logging and versioning  # audit trail requires both
+        risk_events = scanner_output.has_risk_event_logging
+        input_recording = scanner_output.has_input_data_recording
 
         sub_checks = {
             "logging_configured": logging,
             "model_versioned": versioning,
             "audit_trail_exists": audit_trail,
+            "risk_situation_logging": risk_events,
+            "input_data_recording": input_recording,
         }
 
         passed = sum(1 for v in sub_checks.values() if v)
-        status = "PASS" if passed == 3 else ("FAIL" if passed == 0 else "PARTIAL")
+        total = len(sub_checks)
+        status = "PASS" if passed == total else ("FAIL" if passed == 0 else "PARTIAL")
 
         remediation = self._build_remediation(sub_checks) if status != "PASS" else None
 
@@ -46,24 +54,58 @@ class Article12Check:
             status=status,
             severity=self.severity,
             evidence=CheckEvidence(
-                description=self._describe(status),
+                description=self._describe(status, sub_checks),
                 source=f"scan://{scanner_output.repo_url}",
             ),
             details=sub_checks,
             remediation=remediation,
         )
 
-    def _describe(self, status: str) -> str:
+    _FAILURE_DESCRIPTIONS: dict[str, str] = {
+        "logging_configured": f"no logging configured — {ART_12['logging']}",
+        "model_versioned": f"no model versioning — {ART_12['versioning']}",
+        "audit_trail_exists": f"no audit trail — {ART_12['audit_trail']}",
+        "risk_situation_logging": f"no risk event logging — {ART_12['risk_events']}",
+        "input_data_recording": f"no input data recording — {ART_12['input_recording']}",
+    }
+
+    def _describe(self, status: str, sub_checks: dict) -> str:
         if status == "PASS":
-            return "Record-keeping requirements met: logging, versioning, and audit trail in place."
-        return "Record-keeping gaps detected."
+            return (
+                "Record-keeping requirements met: logging, versioning,"
+                " audit trail, risk event logging, and input recording in place."
+            )
+        failures = [
+            self._FAILURE_DESCRIPTIONS.get(k, k.replace("_", " "))
+            for k, v in sub_checks.items() if not v
+        ]
+        return f"Record-keeping gaps: {', '.join(failures)}."
 
     def _build_remediation(self, sub_checks: dict) -> str:
         actions = []
         if not sub_checks["logging_configured"]:
-            actions.append("Configure logging infrastructure to record AI system events.")
+            actions.append(
+                "Configure logging infrastructure to record AI system"
+                " events per Art. 12(1)."
+            )
         if not sub_checks["model_versioned"]:
-            actions.append("Implement model versioning to track changes over time.")
+            actions.append(
+                "Implement model versioning to track changes"
+                " per Art. 12(2)."
+            )
         if not sub_checks["audit_trail_exists"]:
-            actions.append("Establish an audit trail linking inputs, outputs, and model versions.")
+            actions.append(
+                "Establish an audit trail linking inputs, outputs,"
+                " and model versions per Art. 12(1)."
+            )
+        if not sub_checks["risk_situation_logging"]:
+            actions.append(
+                "Log events that identify risk situations"
+                " per Art. 12(2)(a)."
+            )
+        if not sub_checks["input_data_recording"]:
+            actions.append(
+                "Record input data for which the system was used"
+                " per Art. 12(3)(c)."
+            )
         return " ".join(actions)

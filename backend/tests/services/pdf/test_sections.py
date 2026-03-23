@@ -11,11 +11,22 @@ from app.schemas.compliance import (
     ComplianceCheck,
     ComplianceSummary,
 )
-from app.schemas.scanner import DetectedFramework, ScannerOutput
+from app.schemas.scanner import (
+    ConfigSignal,
+    DetectedDomain,
+    DetectedFramework,
+    DocValidation,
+    RiskClassification,
+    ScannerOutput,
+)
 from app.services.pdf.sections import (
     build_article_section,
+    build_config_signals_section,
+    build_doc_validations_section,
+    build_domains_section,
     build_footer,
     build_header,
+    build_risk_section,
     build_summary_section,
 )
 
@@ -166,6 +177,107 @@ class TestBuildArticleSection:
     def test_returns_flowables(self, passing_check):
         result = build_article_section(passing_check)
         assert all(isinstance(f, Flowable) for f in result)
+
+
+class TestBuildRiskSection:
+
+    def test_none_returns_empty(self):
+        assert build_risk_section(None) == []
+
+    def test_with_data_returns_flowables(self):
+        risk = RiskClassification(
+            risk_level="HIGH", risk_score=78, confidence=0.88,
+            annex_iii_category="4a", evidence=[],
+        )
+        result = build_risk_section(risk)
+        assert len(result) > 0
+        assert all(isinstance(f, Flowable) for f in result)
+
+    def test_shows_category(self):
+        risk = RiskClassification(
+            risk_level="HIGH", risk_score=78, confidence=0.88,
+            annex_iii_category="4a", evidence=[],
+        )
+        result = build_risk_section(risk)
+        tables = [f for f in result if isinstance(f, Table)]
+        assert len(tables) >= 1
+
+
+class TestBuildDomainsSection:
+
+    def test_empty_returns_empty(self):
+        assert build_domains_section([]) == []
+
+    def test_with_data_returns_flowables(self):
+        domains = [
+            DetectedDomain(
+                domain="employment", annex_iii_category="4a",
+                confidence=0.9, matched_keywords=["hiring", "candidate"],
+            ),
+        ]
+        result = build_domains_section(domains)
+        assert len(result) > 0
+        assert all(isinstance(f, Flowable) for f in result)
+
+    def test_shows_category_and_confidence(self):
+        domains = [
+            DetectedDomain(
+                domain="employment", annex_iii_category="4a",
+                confidence=0.85, matched_keywords=["hiring"],
+            ),
+        ]
+        result = build_domains_section(domains)
+        tables = [f for f in result if isinstance(f, Table)]
+        assert len(tables) >= 1
+
+
+class TestBuildConfigSignalsSection:
+
+    def test_empty_returns_empty(self):
+        assert build_config_signals_section([]) == []
+
+    def test_with_data_returns_flowables(self):
+        signals = [
+            ConfigSignal(
+                source="docker", framework_hint="tensorflow",
+                detail="GPU runtime detected", confidence=0.8,
+            ),
+        ]
+        result = build_config_signals_section(signals)
+        assert len(result) > 0
+        assert all(isinstance(f, Flowable) for f in result)
+
+
+class TestBuildDocValidationsSection:
+
+    def test_empty_returns_empty(self):
+        assert build_doc_validations_section([]) == []
+
+    def test_with_data_returns_flowables(self):
+        validations = [
+            DocValidation(
+                doc_type="model_card",
+                sections_found=["description", "metrics"],
+                sections_missing=["limitations"],
+                completeness_score=0.67,
+            ),
+        ]
+        result = build_doc_validations_section(validations)
+        assert len(result) > 0
+        assert all(isinstance(f, Flowable) for f in result)
+
+    def test_completeness_score_coloring(self):
+        validations = [
+            DocValidation(
+                doc_type="risk_assessment",
+                sections_found=["overview"],
+                sections_missing=["mitigations", "testing", "monitoring"],
+                completeness_score=0.25,
+            ),
+        ]
+        result = build_doc_validations_section(validations)
+        tables = [f for f in result if isinstance(f, Table)]
+        assert len(tables) >= 1
 
 
 class TestBuildFooter:

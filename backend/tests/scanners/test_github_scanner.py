@@ -41,13 +41,13 @@ README_CONTENT = (
     "# HR AI Model\n\n"
     "Uses SHAP for explainability.\n"
     "Human review is required for all predictions.\n"
-    "Override mechanism available.\n"
-    "Escalation procedures for edge cases.\n"
+    "Override mechanism available for all AI decisions.\n"
+    "Escalation procedure for edge cases.\n"
     "Adversarial testing is performed.\n"
     "Data source: internal HR database.\n"
     "Preprocessing steps documented.\n"
-    "Monitoring dashboards track drift.\n"
-    "Audit logging is enabled.\n"
+    "Model monitoring dashboards track drift detection.\n"
+    "Audit logging is enabled for all decisions.\n"
 )
 
 REQUIREMENTS_CONTENT = "scikit-learn==1.4.0\npandas>=2.0\nfairlearn\n"

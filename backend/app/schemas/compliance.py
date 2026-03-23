@@ -60,3 +60,6 @@ class AssessmentResult(BaseModel):
     checks: list[ComplianceCheck]
     summary: ComplianceSummary
     generated_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
+    risk_tier: str | None = None
+    applicable_articles: list[str] | None = None
+    advisory_checks: list[ComplianceCheck] | None = None

@@ -20,8 +20,10 @@ def pytest_collection_modifyitems(config, items):
                 item.add_marker(skip)
 
 from app.schemas.scanner import (
+    CallChainFinding,
     CodeSignal,
     DetectedFramework,
+    DetectedImport,
     PerformanceMetrics,
     ScannerOutput,
     TrainingDataStats,
@@ -71,6 +73,30 @@ def fully_compliant_scanner_output() -> ScannerOutput:
         has_failure_modes_doc=True,
         has_mitigation_plan=True,
         has_user_instructions=True,
+        # Article 5 — no prohibited indicators (all False = good)
+        has_social_scoring_indicators=False,
+        has_biometric_identification=False,
+        has_emotion_inference=False,
+        # Article 50 — transparency present (all True = good)
+        has_ai_disclosure=True,
+        has_synthetic_content_marking=True,
+        has_provider_identification=True,
+        # Phase 3 new fields — all True for fully compliant
+        has_residual_risk_evaluation=True,
+        has_testing_metrics_defined=True,
+        has_bias_mitigation_docs=True,
+        has_data_gaps_identified=True,
+        has_development_process_docs=True,
+        has_standards_applied=True,
+        has_risk_event_logging=True,
+        has_input_data_recording=True,
+        has_capabilities_limitations=True,
+        has_group_performance_docs=True,
+        has_automation_bias_docs=True,
+        has_stop_mechanism=True,
+        has_cybersecurity_docs=True,
+        has_feedback_loop_prevention=True,
+        has_error_resilience_docs=True,
         training_data_stats=TrainingDataStats(
             provenance_documented=True,
             class_balance={"gender": {"male": 52, "female": 48}},
@@ -122,6 +148,20 @@ def non_compliant_scanner_output() -> ScannerOutput:
 
 
 @pytest.fixture
+def prohibited_scanner_output() -> ScannerOutput:
+    """Scanner output with prohibited AI practice indicators — should fail Art. 5."""
+    return ScannerOutput(
+        repo_url="https://github.com/example/prohibited-ai",
+        has_social_scoring_indicators=True,
+        has_biometric_identification=True,
+        has_emotion_inference=True,
+        has_ai_disclosure=False,
+        has_synthetic_content_marking=False,
+        has_provider_identification=False,
+    )
+
+
+@pytest.fixture
 def partial_scanner_output() -> ScannerOutput:
     """Scanner output with some documentation but gaps — should trigger PARTIAL."""
     return ScannerOutput(
@@ -150,6 +190,22 @@ def partial_scanner_output() -> ScannerOutput:
         has_escalation_docs=False,
         has_failure_modes_doc=True,
         has_mitigation_plan=False,
+        # Phase 3 new fields — mixed for partial
+        has_residual_risk_evaluation=True,
+        has_testing_metrics_defined=False,
+        has_bias_mitigation_docs=False,
+        has_data_gaps_identified=True,
+        has_development_process_docs=True,
+        has_standards_applied=False,
+        has_risk_event_logging=False,
+        has_input_data_recording=True,
+        has_capabilities_limitations=True,
+        has_group_performance_docs=False,
+        has_automation_bias_docs=False,
+        has_stop_mechanism=True,
+        has_cybersecurity_docs=False,
+        has_feedback_loop_prevention=False,
+        has_error_resilience_docs=True,
         training_data_stats=TrainingDataStats(
             provenance_documented=True,
             class_balance={"gender": {"male": 70, "female": 30}},

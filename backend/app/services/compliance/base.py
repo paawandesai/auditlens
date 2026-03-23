@@ -46,6 +46,10 @@ class ComplianceEngine:
         summary = self._compute_summary(results)
         return AssessmentResult(checks=results, summary=summary)
 
+    def run_advisory(self, scanner_output: ScannerOutput) -> list[ComplianceCheck]:
+        """Run checks for informational purposes only (not scored)."""
+        return [check.evaluate(scanner_output) for check in self._checks]
+
     def _compute_summary(self, checks: list[ComplianceCheck]) -> ComplianceSummary:
         """Compute aggregate statistics from individual check results."""
         total = len(checks)

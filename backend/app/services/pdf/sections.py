@@ -17,7 +17,13 @@ from reportlab.platypus import (
 )
 
 from app.schemas.compliance import AssessmentResult, ComplianceCheck, ComplianceSummary
-from app.schemas.scanner import DetectedFramework
+from app.schemas.scanner import (
+    ConfigSignal,
+    DetectedDomain,
+    DetectedFramework,
+    DocValidation,
+    RiskClassification,
+)
 from app.services.pdf.styles import (
     BODY_STYLE,
     HEADING_STYLE,
@@ -112,7 +118,24 @@ def build_summary_section(
     return flowables
 
 
-def build_article_section(check: ComplianceCheck) -> list[Flowable]:
+def build_advisory_header(risk_tier: str) -> list[Flowable]:
+    """Header for the advisory (informational) section of the report."""
+    return [
+        Spacer(1, 16),
+        Paragraph("Advisory Checks (Informational)", HEADING_STYLE),
+        Paragraph(
+            f"This <b>{risk_tier}</b>-risk system is assessed against Articles 5 and 50. "
+            "Articles 9\u201315 below are shown for informational purposes only "
+            "and do not affect the compliance score.",
+            SMALL_STYLE,
+        ),
+        Spacer(1, 8),
+    ]
+
+
+def build_article_section(
+    check: ComplianceCheck, *, advisory: bool = False,
+) -> list[Flowable]:
     """Single article compliance check section with status, evidence, and remediation."""
     flowables: list[Flowable] = []
 
@@ -120,10 +143,14 @@ def build_article_section(check: ComplianceCheck) -> list[Flowable]:
     status_color = STATUS_COLORS.get(check.status, colors.gray)
     severity_color = SEVERITY_COLORS.get(check.severity, colors.gray)
 
+    # Advisory sections use muted grey heading
+    heading_style = SMALL_STYLE if advisory else HEADING_STYLE
+    prefix = "[Advisory] " if advisory else ""
+
     flowables.append(
         Paragraph(
-            f"{check.article}: {check.rule_name}",
-            HEADING_STYLE,
+            f"{prefix}{check.article}: {check.rule_name}",
+            heading_style,
         )
     )
 
@@ -196,6 +223,158 @@ def build_article_section(check: ComplianceCheck) -> list[Flowable]:
         )
 
     flowables.append(Spacer(1, 8))
+    return flowables
+
+
+def build_risk_section(risk: RiskClassification | None) -> list[Flowable]:
+    """Risk classification summary — level, score, category."""
+    if risk is None:
+        return []
+
+    flowables: list[Flowable] = []
+    flowables.append(Paragraph("Risk Classification", HEADING_STYLE))
+
+    level_colors = {
+        "HIGH": colors.HexColor("#d93636"),
+        "UNACCEPTABLE": colors.HexColor("#8b0000"),
+        "LIMITED": colors.HexColor("#f2a60d"),
+        "MINIMAL": colors.HexColor("#2eb872"),
+        "UNDETERMINED": colors.HexColor("#888888"),
+    }
+    level_color = level_colors.get(risk.risk_level, colors.gray)
+
+    data = [
+        ["Risk Level", risk.risk_level],
+        ["Risk Score", f"{risk.risk_score}/100"],
+        ["Confidence", f"{risk.confidence:.0%}"],
+    ]
+    if risk.annex_iii_category:
+        data.append(["Annex III Category", risk.annex_iii_category])
+
+    table = Table(data, colWidths=[2.0 * inch, 3.5 * inch])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f0f0f0")),
+        ("BACKGROUND", (1, 0), (1, 0), level_color),
+        ("TEXTCOLOR", (1, 0), (1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dddddd")),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    flowables.append(table)
+    flowables.append(Spacer(1, 12))
+    return flowables
+
+
+def build_domains_section(domains: list[DetectedDomain]) -> list[Flowable]:
+    """Annex III domain classification table."""
+    if not domains:
+        return []
+
+    flowables: list[Flowable] = []
+    flowables.append(Paragraph("Annex III Domain Classification", HEADING_STYLE))
+
+    data = [["Domain", "Category", "Confidence", "Keywords"]]
+    for d in domains:
+        keywords = ", ".join(d.matched_keywords[:4])
+        data.append([
+            d.domain.replace("_", " ").title(),
+            d.annex_iii_category,
+            f"{d.confidence:.0%}",
+            keywords,
+        ])
+
+    table = Table(data, colWidths=[1.5 * inch, 1.0 * inch, 1.0 * inch, 2.0 * inch])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4a3f8a")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dddddd")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    flowables.append(table)
+    flowables.append(Spacer(1, 10))
+    return flowables
+
+
+def build_config_signals_section(signals: list[ConfigSignal]) -> list[Flowable]:
+    """Infrastructure AI signals table."""
+    if not signals:
+        return []
+
+    flowables: list[Flowable] = []
+    flowables.append(Paragraph("Infrastructure AI Signals", HEADING_STYLE))
+
+    data = [["Source", "Framework", "Detail"]]
+    for s in signals:
+        data.append([s.source.upper(), s.framework_hint, s.detail])
+
+    table = Table(data, colWidths=[1.0 * inch, 1.5 * inch, 3.0 * inch])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#b45309")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dddddd")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    flowables.append(table)
+    flowables.append(Spacer(1, 10))
+    return flowables
+
+
+def build_doc_validations_section(validations: list[DocValidation]) -> list[Flowable]:
+    """Document completeness assessment table."""
+    if not validations:
+        return []
+
+    flowables: list[Flowable] = []
+    flowables.append(Paragraph("Document Completeness", HEADING_STYLE))
+
+    data = [["Document", "Completeness", "Found", "Missing"]]
+    for v in validations:
+        found = ", ".join(v.sections_found[:3]) or "—"
+        missing = ", ".join(v.sections_missing[:3]) or "—"
+        pct = f"{v.completeness_score:.0%}"
+        data.append([v.doc_type.replace("_", " ").title(), pct, found, missing])
+
+    table = Table(data, colWidths=[1.5 * inch, 1.0 * inch, 1.5 * inch, 1.5 * inch])
+
+    style_cmds = [
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e40af")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dddddd")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+    ]
+    # Color-code completeness cells
+    for row_idx, v in enumerate(validations, start=1):
+        if v.completeness_score >= 0.8:
+            cell_color = colors.HexColor("#2eb872")
+        elif v.completeness_score >= 0.5:
+            cell_color = colors.HexColor("#f2a60d")
+        else:
+            cell_color = colors.HexColor("#d93636")
+        style_cmds.append(("BACKGROUND", (1, row_idx), (1, row_idx), cell_color))
+        style_cmds.append(("TEXTCOLOR", (1, row_idx), (1, row_idx), colors.white))
+
+    table.setStyle(TableStyle(style_cmds))
+    flowables.append(table)
+    flowables.append(Spacer(1, 10))
     return flowables
 
 

@@ -22,6 +22,7 @@ from app.scanners.github_scanner import (
 )
 from app.schemas.compliance import AssessmentResult
 from app.schemas.scanner import ScannerOutput
+from app.services.compliance.article_05 import Article05Check
 from app.services.compliance.article_09 import Article09Check
 from app.services.compliance.article_10 import Article10Check
 from app.services.compliance.article_11 import Article11Check
@@ -29,6 +30,7 @@ from app.services.compliance.article_12 import Article12Check
 from app.services.compliance.article_13 import Article13Check
 from app.services.compliance.article_14 import Article14Check
 from app.services.compliance.article_15 import Article15Check
+from app.services.compliance.article_50 import Article50Check
 from app.services.compliance.base import ComplianceEngine
 from app.services.grc.base import AdapterRegistry
 from app.services.grc.drata_adapter import DrataAdapter
@@ -39,7 +41,14 @@ from app.services.pdf.report_builder import generate_compliance_pdf
 
 router = APIRouter(prefix="/api/v1/scans", tags=["Scanning"])
 
-ALL_CHECKS = [
+# Universal checks — apply to ALL AI systems regardless of risk level
+UNIVERSAL_CHECKS = [
+    Article05Check(),
+    Article50Check(),
+]
+
+# High-risk only checks — Art. 9-15
+HIGH_RISK_CHECKS = [
     Article09Check(),
     Article10Check(),
     Article11Check(),
@@ -48,6 +57,9 @@ ALL_CHECKS = [
     Article14Check(),
     Article15Check(),
 ]
+
+# Legacy: all checks combined (for backward compat)
+ALL_CHECKS = UNIVERSAL_CHECKS + HIGH_RISK_CHECKS
 
 
 class RepoScanRequest(BaseModel):
@@ -58,7 +70,12 @@ class RepoScanRequest(BaseModel):
 async def _run_scan(
     request: RepoScanRequest,
 ) -> tuple[ScannerOutput, AssessmentResult]:
-    """Shared scan logic for /repo and /repo/pdf."""
+    """Shared scan logic for /repo and /repo/pdf.
+
+    Applies risk-tiered check selection:
+    - Art. 5 + 50 always run (universal obligations)
+    - Art. 9-15 only scored for HIGH risk; advisory for others
+    """
     scanner = GitHubScanner()
 
     try:
@@ -73,8 +90,33 @@ async def _run_scan(
     except GitHubScanError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    engine = ComplianceEngine(ALL_CHECKS)
+    # Determine risk tier
+    risk_level = "UNDETERMINED"
+    if scanner_output.risk_classification:
+        risk_level = scanner_output.risk_classification.risk_level
+
+    # Select scored checks by risk tier
+    if risk_level == "HIGH":
+        scored_checks = UNIVERSAL_CHECKS + HIGH_RISK_CHECKS
+        applicable_articles = [
+            "Article 5", "Article 50",
+            "Article 9", "Article 10", "Article 11",
+            "Article 12", "Article 13", "Article 14", "Article 15",
+        ]
+        advisory_checks = None
+    else:
+        scored_checks = UNIVERSAL_CHECKS
+        applicable_articles = ["Article 5", "Article 50"]
+        # Run Art. 9-15 as advisory (informational, not scored)
+        advisory_engine = ComplianceEngine(HIGH_RISK_CHECKS)
+        advisory_checks = advisory_engine.run_advisory(scanner_output)
+
+    engine = ComplianceEngine(scored_checks)
     assessment = engine.run(scanner_output)
+    assessment.risk_tier = risk_level
+    assessment.applicable_articles = applicable_articles
+    assessment.advisory_checks = advisory_checks
+
     return scanner_output, assessment
 
 

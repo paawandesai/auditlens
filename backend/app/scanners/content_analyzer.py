@@ -1,12 +1,22 @@
 """Pure-logic content analysis for compliance signal detection.
 
-Two stateless functions that map repository file trees and file contents
+Stateless functions that map repository file trees and file contents
 onto ScannerOutput boolean fields. No I/O — receives pre-fetched data.
+
+Includes section-based document validation (ported from Systima Comply,
+Apache 2.0) to check whether compliance docs contain required sections.
+
+Phase 2 overhaul: KeywordRule with word boundaries and negative patterns
+to reduce false positives from generic keywords.
 """
 
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass, field
 from fnmatch import fnmatch
+
+from app.schemas.scanner import DocValidation
 
 # ---------------------------------------------------------------------------
 # File-tree patterns → ScannerOutput field mapping
@@ -55,41 +65,318 @@ BIAS_FILE_PATTERNS: list[str] = [
     "*bias_report*", "*bias-report*", "*fairness_report*", "*fairness-report*",
 ]
 
-# ---------------------------------------------------------------------------
-# Content keyword patterns → ScannerOutput field mapping
-# ---------------------------------------------------------------------------
-# Each entry: (ScannerOutput field, list of substring/regex patterns)
-# Matching is case-insensitive on the combined content string.
 
-CONTENT_RULES: list[tuple[str, list[str]]] = [
+# ---------------------------------------------------------------------------
+# KeywordRule — Phase 2 smart matching infrastructure
+# ---------------------------------------------------------------------------
+
+# High-trust file patterns (docs, model cards, risk assessments)
+_HIGH_TRUST_PATTERNS = (
+    "readme", "model_card", "model-card", "risk_assessment", "risk-assessment",
+    "data_card", "data-card", "dataset_card", "datasheet", "docs/",
+    "doc/", "guide", "transparency", "human_oversight",
+)
+
+# Source code file extensions
+_SOURCE_CODE_EXTENSIONS = (
+    ".py", ".js", ".ts", ".jsx", ".tsx", ".java", ".go", ".rs", ".rb",
+    ".c", ".cpp", ".h", ".cs", ".swift", ".kt",
+)
+
+
+def _is_high_trust_file(filename: str) -> bool:
+    """Check if a filename is a high-trust documentation file."""
+    lower = filename.lower()
+    return any(pat in lower for pat in _HIGH_TRUST_PATTERNS)
+
+
+def _is_source_code_file(filename: str) -> bool:
+    """Check if a filename is a source code file."""
+    lower = filename.lower()
+    return any(lower.endswith(ext) for ext in _SOURCE_CODE_EXTENSIONS)
+
+
+@dataclass(frozen=True)
+class KeywordRule:
+    """A keyword matching rule with optional precision controls.
+
+    Attributes:
+        keyword: The search term (case-insensitive).
+        word_boundary: If True, use \\b regex for exact word matching.
+        negative_patterns: Skip match if any of these found nearby.
+        require_doc_context: Only match in docs/README, not source code.
+        min_source_occurrences: Minimum occurrences needed in source code files.
+    """
+
+    keyword: str
+    word_boundary: bool = False
+    negative_patterns: tuple[str, ...] = ()
+    require_doc_context: bool = False
+    min_source_occurrences: int = 1
+
+
+def _matches_keyword_in_text(rule: KeywordRule, text: str) -> bool:
+    """Check if a keyword rule matches within a text string (already lowered)."""
+    if rule.word_boundary:
+        pattern = r"\b" + re.escape(rule.keyword) + r"\b"
+        if not re.search(pattern, text, re.IGNORECASE):
+            return False
+    else:
+        if rule.keyword not in text:
+            return False
+
+    if rule.negative_patterns:
+        for neg in rule.negative_patterns:
+            if neg in text:
+                return False
+
+    return True
+
+
+def _matches_keyword_per_file(
+    rule: KeywordRule, contents: dict[str, str],
+) -> bool:
+    """Check if a keyword rule matches across files with context awareness."""
+    for filename, content in contents.items():
+        lower_content = content.lower()
+
+        if rule.require_doc_context and _is_source_code_file(filename):
+            continue
+
+        if _is_source_code_file(filename) and rule.min_source_occurrences > 1:
+            if rule.word_boundary:
+                pattern = r"\b" + re.escape(rule.keyword) + r"\b"
+                count = len(re.findall(pattern, lower_content, re.IGNORECASE))
+            else:
+                count = lower_content.count(rule.keyword)
+            if count >= rule.min_source_occurrences:
+                if not rule.negative_patterns or not any(
+                    neg in lower_content for neg in rule.negative_patterns
+                ):
+                    return True
+            continue
+
+        if _matches_keyword_in_text(rule, lower_content):
+            return True
+
+    return False
+
+
+# ---------------------------------------------------------------------------
+# Content keyword rules → ScannerOutput field mapping (Phase 2 overhaul)
+# ---------------------------------------------------------------------------
+
+CONTENT_RULES: list[tuple[str, list[KeywordRule]]] = [
     ("has_human_oversight_docs", [
-        "human review", "manual review", "human-in-the-loop", "human in the loop",
+        KeywordRule("human review"),
+        KeywordRule("manual review"),
+        KeywordRule("human-in-the-loop"),
+        KeywordRule("human in the loop"),
     ]),
+    # Phase 2B: "override" → compound phrases only to avoid method/CSS overrides
     ("has_override_mechanism", [
-        "override", "kill_switch", "kill switch",
+        KeywordRule("override decision"),
+        KeywordRule("override output"),
+        KeywordRule("override mechanism"),
+        KeywordRule("override model"),
+        KeywordRule("override ai"),
+        KeywordRule("override prediction"),
+        KeywordRule("kill_switch"),
+        KeywordRule("kill switch"),
     ]),
     ("has_escalation_docs", [
-        "escalat", "stop button", "halt the system", "interrupt the system",
-        "emergency stop", "safe state",
+        # Phase 2B: compound only — bare "escalat" hits "escalate privileges"
+        KeywordRule("escalation procedure"),
+        KeywordRule("escalation path"),
+        KeywordRule("escalate to human"),
+        KeywordRule("escalation process"),
+        KeywordRule("stop button"),
+        KeywordRule("halt the system"),
+        KeywordRule("interrupt the system"),
+        KeywordRule("emergency stop"),
+        KeywordRule("safe state"),
     ]),
     ("has_feature_importance_docs", [
-        "feature importance",
+        KeywordRule("feature importance"),
     ]),
+    # Phase 2B: word-boundary for shap/lime, keep explainab as substring
     ("has_explainability", [
-        "shap", "lime", "explainab",
+        KeywordRule("shap", word_boundary=True),
+        KeywordRule("lime", word_boundary=True),
+        KeywordRule("explainab"),
     ]),
+    # Phase 2B: compound phrases only — bare "logging" matches import logging
     ("has_logging_config", [
-        "audit log", "logging", "telemetry", "event record",
+        KeywordRule("audit log"),
+        KeywordRule("audit logging"),
+        KeywordRule("event logging"),
+        KeywordRule("event record"),
+        KeywordRule("decision log"),
     ]),
+    # Phase 2B: compound phrases only — bare "monitoring"/"drift" are too generic
     ("has_mitigation_plan", [
-        "monitoring", "drift",
+        KeywordRule("model monitoring"),
+        KeywordRule("drift monitoring"),
+        KeywordRule("risk monitoring"),
+        KeywordRule("ai monitoring"),
+        KeywordRule("drift detection"),
+        KeywordRule("model drift"),
+    ]),
+    # --- Phase 3 new fields ---
+    # Article 9
+    ("has_residual_risk_evaluation", [
+        KeywordRule("residual risk"),
+        KeywordRule("remaining risk"),
+        KeywordRule("accepted risk"),
+    ]),
+    ("has_testing_metrics_defined", [
+        KeywordRule("acceptance criteria"),
+        KeywordRule("metric threshold"),
+        KeywordRule("test against"),
+        KeywordRule("performance threshold"),
+    ]),
+    # Article 10
+    ("has_bias_mitigation_docs", [
+        KeywordRule("bias mitigation"),
+        KeywordRule("debiasing"),
+        KeywordRule("fairness constraint"),
+        KeywordRule("rebalancing"),
+    ]),
+    ("has_data_gaps_identified", [
+        KeywordRule("data gap"),
+        KeywordRule("underrepresented"),
+        KeywordRule("missing data"),
+        KeywordRule("data limitation"),
+    ]),
+    # Article 11
+    ("has_development_process_docs", [
+        KeywordRule("design specification"),
+        KeywordRule("training methodology"),
+        KeywordRule("development process"),
+    ]),
+    ("has_standards_applied", [
+        KeywordRule("harmonised standard"),
+        KeywordRule("iso 42001"),
+        KeywordRule("iso/iec"),
+        KeywordRule("en standard"),
+    ]),
+    # Article 12
+    ("has_risk_event_logging", [
+        KeywordRule("risk event"),
+        KeywordRule("safety event"),
+        KeywordRule("incident log"),
+        KeywordRule("anomaly detection"),
+    ]),
+    ("has_input_data_recording", [
+        KeywordRule("input logging"),
+        KeywordRule("request logging"),
+        KeywordRule("input recording"),
+        KeywordRule("data retention"),
+    ]),
+    # Article 13
+    ("has_capabilities_limitations", [
+        KeywordRule("known limitation"),
+        KeywordRule("intended use"),
+        KeywordRule("capabilities and limitation"),
+    ]),
+    ("has_group_performance_docs", [
+        KeywordRule("disaggregated"),
+        KeywordRule("group performance"),
+        KeywordRule("subgroup analysis"),
+        KeywordRule("demographic"),
+    ]),
+    # Article 14
+    ("has_automation_bias_docs", [
+        KeywordRule("automation bias"),
+        KeywordRule("over-reliance"),
+        KeywordRule("human judgment"),
+    ]),
+    ("has_stop_mechanism", [
+        KeywordRule("stop button"),
+        KeywordRule("emergency stop"),
+        KeywordRule("safe halt"),
+        KeywordRule("kill switch"),
+        KeywordRule("kill_switch"),
+    ]),
+    # Article 15
+    ("has_cybersecurity_docs", [
+        KeywordRule("data poisoning"),
+        KeywordRule("model poisoning"),
+        KeywordRule("adversarial defense"),
+        KeywordRule("model evasion"),
+        KeywordRule("cybersecurity"),
+        KeywordRule("security measure"),
+    ]),
+    ("has_feedback_loop_prevention", [
+        KeywordRule("feedback loop"),
+        KeywordRule("recursive bias"),
+        KeywordRule("self-reinforcing"),
+    ]),
+    ("has_error_resilience_docs", [
+        KeywordRule("error resilience"),
+        KeywordRule("fault tolerance"),
+        KeywordRule("graceful degradation"),
+        KeywordRule("fail-safe"),
+    ]),
+    # --- Article 5 prohibited practice indicators ---
+    ("has_social_scoring_indicators", [
+        KeywordRule("social score"),
+        KeywordRule("citizen score"),
+        KeywordRule("social credit"),
+        KeywordRule("social scoring"),
+    ]),
+    ("has_biometric_identification", [
+        KeywordRule("real-time biometric"),
+        KeywordRule("facial recognition"),
+        KeywordRule("face_recognition"),
+        KeywordRule("deepface"),
+        KeywordRule("insightface"),
+        KeywordRule("biometric identification"),
+    ]),
+    ("has_emotion_inference", [
+        KeywordRule("emotion detection"),
+        KeywordRule("emotion recognition"),
+        KeywordRule("emotion inference"),
+        KeywordRule("affect recognition"),
+        KeywordRule("facial emotion"),
+    ]),
+    # --- Article 50 transparency signals ---
+    ("has_ai_disclosure", [
+        KeywordRule("ai disclosure"),
+        KeywordRule("powered by ai"),
+        KeywordRule("ai-generated"),
+        KeywordRule("generated by ai"),
+        KeywordRule("this is an ai"),
+        KeywordRule("chatbot"),
+        KeywordRule("ai assistant"),
+    ]),
+    ("has_synthetic_content_marking", [
+        KeywordRule("watermark"),
+        KeywordRule("synthetic content"),
+        KeywordRule("ai-generated content"),
+        KeywordRule("machine-generated"),
+        KeywordRule("content provenance"),
+        KeywordRule("c2pa"),
+    ]),
+    ("has_provider_identification", [
+        KeywordRule("provider name", require_doc_context=True),
+        KeywordRule("contact information", require_doc_context=True),
+        KeywordRule("developed by", require_doc_context=True),
+        KeywordRule("maintained by", require_doc_context=True),
+        KeywordRule("version:", require_doc_context=True),
     ]),
 ]
 
-# Content patterns for TrainingDataStats sub-fields
+# Content patterns for TrainingDataStats sub-fields (unchanged)
 TRAINING_DATA_CONTENT_RULES: list[tuple[str, list[str]]] = [
     ("provenance_documented", ["data source", "provenance"]),
     ("preprocessing_documented", ["preprocessing", "feature engineer"]),
+]
+
+# Content patterns for quality_metrics_logged (Phase 1C replacement)
+QUALITY_METRICS_KEYWORDS: list[str] = [
+    "data quality metric", "quality score", "completeness rate",
+    "data quality", "quality metrics",
 ]
 
 # AI API key variable names — presence in .env.example signals AI usage
@@ -115,7 +402,7 @@ def check_file_tree_flags(file_paths: list[str]) -> dict[str, bool]:
 
     flags: dict[str, bool] = {}
 
-    for field, patterns in FILE_TREE_RULES:
+    for field_name, patterns in FILE_TREE_RULES:
         matched = any(
             fnmatch(fp, pat.lower())
             for fp in lowered
@@ -123,7 +410,7 @@ def check_file_tree_flags(file_paths: list[str]) -> dict[str, bool]:
         )
         # Some fields (e.g. has_logging_config) appear in both file-tree and content
         # rules — use OR so either detection method can flip the flag.
-        flags[field] = flags.get(field, False) or matched
+        flags[field_name] = flags.get(field_name, False) or matched
 
     # Internal flags consumed by the scanner to build typed models
     flags["performance_metrics_present"] = any(
@@ -147,6 +434,9 @@ def check_file_tree_flags(file_paths: list[str]) -> dict[str, bool]:
 def extract_content_flags(contents: dict[str, str]) -> dict[str, bool | dict[str, bool]]:
     """Keyword-match file contents for compliance signals.
 
+    Phase 2 overhaul: uses KeywordRule with word boundaries and per-file
+    context awareness to reduce false positives.
+
     Args:
         contents: dict mapping filename → file content text.
 
@@ -154,21 +444,25 @@ def extract_content_flags(contents: dict[str, str]) -> dict[str, bool | dict[str
         dict with ScannerOutput field names as keys.
         Also includes ``training_data_sub`` dict with sub-field bools.
     """
-    combined = "\n".join(contents.values()).lower()
-
     flags: dict[str, bool | dict[str, bool]] = {}
 
-    for field, keywords in CONTENT_RULES:
-        matched = any(kw in combined for kw in keywords)
-        flags[field] = bool(flags.get(field, False)) or matched
+    for field_name, rules in CONTENT_RULES:
+        matched = any(_matches_keyword_per_file(rule, contents) for rule in rules)
+        flags[field_name] = bool(flags.get(field_name, False)) or matched
 
-    # Training data sub-field signals
+    # Training data sub-field signals (simple substring — low FP risk)
+    combined = "\n".join(contents.values()).lower()
     training_sub: dict[str, bool] = {}
     for sub_field, keywords in TRAINING_DATA_CONTENT_RULES:
         training_sub[sub_field] = any(kw in combined for kw in keywords)
     flags["training_data_sub"] = training_sub
 
-    # Adversarial testing signal
+    # Quality metrics signal (Phase 1C — real content match)
+    flags["quality_metrics_found"] = any(
+        kw in combined for kw in QUALITY_METRICS_KEYWORDS
+    )
+
+    # Adversarial testing signal (unchanged — low FP risk in doc context)
     flags["adversarial_tested"] = any(
         kw in combined for kw in ["adversarial", "robustness test"]
     )
@@ -180,3 +474,80 @@ def extract_content_flags(contents: dict[str, str]) -> dict[str, bool | dict[str
     )
 
     return flags
+
+
+# ---------------------------------------------------------------------------
+# Section-based document validation (ported from Systima Comply, Apache 2.0)
+# ---------------------------------------------------------------------------
+
+# Required section keywords per document type.
+# A document "has" a section if any of the keywords appear (case-insensitive).
+DOC_SECTION_REQUIREMENTS: dict[str, list[str]] = {
+    "risk_assessment": [
+        "risk identification", "risk estimation", "risk evaluation",
+        "risk mitigation", "residual risk",
+    ],
+    "data_documentation": [
+        "data sources", "data quality", "bias",
+    ],
+    "model_card": [
+        "intended use", "limitations", "performance", "training data",
+    ],
+    "transparency": [
+        "capabilities", "limitations", "intended use",
+    ],
+    "human_oversight": [
+        "oversight", "intervention", "override",
+    ],
+}
+
+# Map filename patterns to doc types
+_DOC_TYPE_PATTERNS: list[tuple[str, list[str]]] = [
+    ("risk_assessment", ["risk_assessment", "risk-assessment", "risk_management", "risk-management"]),
+    ("data_documentation", ["data_card", "data-card", "dataset_card", "dataset-card", "datasheet"]),
+    ("model_card", ["model_card", "model-card"]),
+    ("transparency", ["transparency"]),
+    ("human_oversight", ["human_oversight", "human-oversight"]),
+]
+
+
+def _classify_doc_type(filename: str) -> str | None:
+    """Classify a filename into a doc_type, or None if unrecognized."""
+    lower = filename.lower()
+    for doc_type, patterns in _DOC_TYPE_PATTERNS:
+        if any(pat in lower for pat in patterns):
+            return doc_type
+    return None
+
+
+def validate_doc_sections(filename: str, content: str) -> DocValidation | None:
+    """Check if a compliance doc contains required section keywords.
+
+    Args:
+        filename: The file name/path of the document.
+        content: The document's text content.
+
+    Returns:
+        DocValidation with completeness score, or None if the filename
+        doesn't match a known doc type.
+    """
+    doc_type = _classify_doc_type(filename)
+    if doc_type is None:
+        return None
+
+    required = DOC_SECTION_REQUIREMENTS.get(doc_type, [])
+    if not required:
+        return None
+
+    lower_content = content.lower()
+    found = [section for section in required if section in lower_content]
+    missing = [section for section in required if section not in lower_content]
+
+    completeness = len(found) / len(required) if required else 0.0
+
+    return DocValidation(
+        doc_type=doc_type,
+        sections_found=found,
+        sections_missing=missing,
+        completeness_score=round(completeness, 2),
+    )

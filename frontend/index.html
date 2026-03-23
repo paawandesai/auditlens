@@ -57,13 +57,32 @@
       <!-- Summary Banner -->
       <div id="summary-banner" class="rounded-lg border p-6">
         <div class="flex items-center justify-between flex-wrap gap-4">
-          <div>
+          <div class="flex items-center gap-3 flex-wrap">
             <span id="overall-status" class="text-lg font-bold px-3 py-1 rounded-full"></span>
-            <span id="compliance-score" class="ml-3 text-2xl font-bold"></span>
+            <span id="compliance-score" class="text-2xl font-bold"></span>
+            <span id="risk-badge" class="hidden text-sm font-bold px-3 py-1 rounded-full"></span>
           </div>
           <div id="summary-stats" class="text-gray-400 text-sm"></div>
         </div>
         <div id="frameworks-list" class="mt-4 text-sm text-gray-400"></div>
+      </div>
+
+      <!-- Detected Domains -->
+      <div id="domains-section" class="hidden rounded-lg border border-purple-800 bg-purple-950/30 p-5">
+        <h3 class="text-sm font-semibold text-purple-300 uppercase tracking-wide mb-3">Annex III Domain Classification</h3>
+        <div id="domains-list" class="space-y-2"></div>
+      </div>
+
+      <!-- Config Signals -->
+      <div id="config-signals-section" class="hidden rounded-lg border border-amber-800 bg-amber-950/30 p-5">
+        <h3 class="text-sm font-semibold text-amber-300 uppercase tracking-wide mb-3">Infrastructure AI Signals</h3>
+        <div id="config-signals-list" class="space-y-2"></div>
+      </div>
+
+      <!-- Doc Validations -->
+      <div id="doc-validations-section" class="hidden rounded-lg border border-blue-800 bg-blue-950/30 p-5">
+        <h3 class="text-sm font-semibold text-blue-300 uppercase tracking-wide mb-3">Document Completeness</h3>
+        <div id="doc-validations-list" class="space-y-3"></div>
       </div>
 
       <!-- Article Cards -->
@@ -110,6 +129,7 @@
       : 'https://auditlens-9hox.onrender.com';
 
     const ARTICLE_TITLES = {
+      'EU_AI_ART_5':  'Prohibited AI Practices',
       'EU_AI_ART_9':  'Risk Management System',
       'EU_AI_ART_10': 'Data & Data Governance',
       'EU_AI_ART_11': 'Technical Documentation',
@@ -117,6 +137,7 @@
       'EU_AI_ART_13': 'Transparency & Explainability',
       'EU_AI_ART_14': 'Human Oversight',
       'EU_AI_ART_15': 'Accuracy, Robustness & Security',
+      'EU_AI_ART_50': 'Transparency Obligations',
     };
 
     const SEVERITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -211,11 +232,98 @@
         `${summary.passed}/${summary.total_checks} passing` +
         (critCount > 0 ? ` \u00B7 ${critCount} critical failure${critCount > 1 ? 's' : ''}` : '');
 
+      // Risk badge
+      const risk = scanner.risk_classification;
+      const riskBadge = $('risk-badge');
+      if (risk && risk.risk_level !== 'UNDETERMINED') {
+        const RISK_STYLES = {
+          UNACCEPTABLE: 'bg-red-800 text-white',
+          HIGH: 'bg-red-600 text-white',
+          LIMITED: 'bg-yellow-600 text-gray-900',
+          MINIMAL: 'bg-green-600 text-white',
+        };
+        riskBadge.className = `text-sm font-bold px-3 py-1 rounded-full ${RISK_STYLES[risk.risk_level] || 'bg-gray-600 text-white'}`;
+        riskBadge.textContent = `Risk: ${risk.risk_level}` + (risk.annex_iii_category ? ` (Cat ${risk.annex_iii_category})` : '') + ` ${risk.risk_score}/100`;
+        riskBadge.classList.remove('hidden');
+      } else {
+        riskBadge.classList.add('hidden');
+      }
+
       // Frameworks
       const fws = (scanner.detected_frameworks || []).map(f => f.name);
       $('frameworks-list').textContent = fws.length > 0
         ? `Frameworks detected: ${fws.join(', ')}`
         : 'No AI/ML frameworks detected in dependency manifests.';
+
+      // Detected Domains
+      const domains = scanner.detected_domains || [];
+      if (domains.length > 0) {
+        const container = $('domains-list');
+        container.innerHTML = '';
+        for (const d of domains) {
+          const el = document.createElement('div');
+          el.className = 'flex items-center gap-2 flex-wrap';
+          el.innerHTML = `
+            <span class="text-xs font-bold px-2 py-0.5 rounded bg-purple-700 text-purple-100">${d.domain.replace(/_/g, ' ')}</span>
+            <span class="text-xs px-2 py-0.5 rounded bg-purple-900 text-purple-300">Cat ${d.annex_iii_category}</span>
+            <span class="text-xs text-purple-400">${Math.round(d.confidence * 100)}% confidence</span>
+            <span class="text-xs text-gray-500">${d.matched_keywords.slice(0, 4).join(', ')}</span>
+          `;
+          container.appendChild(el);
+        }
+        show('domains-section');
+      } else {
+        hide('domains-section');
+      }
+
+      // Config Signals
+      const configSignals = scanner.config_signals || [];
+      if (configSignals.length > 0) {
+        const container = $('config-signals-list');
+        container.innerHTML = '';
+        for (const s of configSignals) {
+          const el = document.createElement('div');
+          el.className = 'flex items-center gap-2 flex-wrap';
+          el.innerHTML = `
+            <span class="text-xs font-bold px-2 py-0.5 rounded bg-amber-700 text-amber-100 uppercase">${s.source}</span>
+            <span class="text-xs px-2 py-0.5 rounded bg-amber-900 text-amber-300">${s.framework_hint}</span>
+            <span class="text-xs text-gray-400">${s.detail}</span>
+          `;
+          container.appendChild(el);
+        }
+        show('config-signals-section');
+      } else {
+        hide('config-signals-section');
+      }
+
+      // Doc Validations
+      const docVals = scanner.doc_validations || [];
+      if (docVals.length > 0) {
+        const container = $('doc-validations-list');
+        container.innerHTML = '';
+        for (const v of docVals) {
+          const pct = Math.round(v.completeness_score * 100);
+          const barColor = pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500';
+          const el = document.createElement('div');
+          el.innerHTML = `
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-sm text-blue-200 font-medium">${v.doc_type.replace(/_/g, ' ')}</span>
+              <span class="text-xs text-gray-400">${pct}% complete</span>
+            </div>
+            <div class="w-full bg-gray-700 rounded-full h-2 mb-1">
+              <div class="${barColor} h-2 rounded-full transition-all" style="width: ${pct}%"></div>
+            </div>
+            <div class="text-xs text-gray-500">
+              ${v.sections_found.length > 0 ? `<span class="text-green-400">Found:</span> ${v.sections_found.join(', ')}` : ''}
+              ${v.sections_missing.length > 0 ? `<span class="text-red-400 ml-2">Missing:</span> ${v.sections_missing.join(', ')}` : ''}
+            </div>
+          `;
+          container.appendChild(el);
+        }
+        show('doc-validations-section');
+      } else {
+        hide('doc-validations-section');
+      }
 
       // Sort checks: FAIL first (by severity), then PARTIAL, then PASS
       const sorted = [...checks].sort((a, b) => {
@@ -224,7 +332,7 @@
         return (SEVERITY_ORDER[a.severity] || 3) - (SEVERITY_ORDER[b.severity] || 3);
       });
 
-      // Render article cards
+      // Render scored article cards
       const container = $('article-cards');
       container.innerHTML = '';
 
@@ -232,11 +340,37 @@
         container.appendChild(createArticleCard(check));
       }
 
+      // Render advisory cards (Art. 9-15 for non-HIGH risk, informational)
+      const advisoryChecks = assessment.advisory_checks || [];
+      if (advisoryChecks.length > 0) {
+        const advisoryHeader = document.createElement('div');
+        advisoryHeader.className = 'mt-6 mb-3';
+        advisoryHeader.innerHTML = `
+          <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide">Advisory Checks (Informational)</h3>
+          <p class="text-xs text-gray-500 mt-1">
+            This <span class="font-semibold">${assessment.risk_tier || 'UNDETERMINED'}</span>-risk system is assessed against Articles 5 and 50.
+            Articles 9\u201315 below are shown for informational purposes only.
+          </p>
+        `;
+        container.appendChild(advisoryHeader);
+
+        const sortedAdvisory = [...advisoryChecks].sort((a, b) => {
+          const sd = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+          if (sd !== 0) return sd;
+          return (SEVERITY_ORDER[a.severity] || 3) - (SEVERITY_ORDER[b.severity] || 3);
+        });
+        for (const check of sortedAdvisory) {
+          container.appendChild(createArticleCard(check, true));
+        }
+      }
+
       show('results');
     }
 
-    function createArticleCard(check) {
-      const style = STATUS_STYLES[check.status] || STATUS_STYLES.FAIL;
+    function createArticleCard(check, advisory = false) {
+      const style = advisory
+        ? { card: 'bg-gray-900/50 border-gray-700 opacity-70', badge: 'bg-gray-600 text-white' }
+        : (STATUS_STYLES[check.status] || STATUS_STYLES.FAIL);
       const sevStyle = SEVERITY_STYLES[check.severity] || SEVERITY_STYLES.medium;
       const title = ARTICLE_TITLES[check.rule_id] || check.rule_name;
 
@@ -252,10 +386,14 @@
       // Header row
       const header = document.createElement('div');
       header.className = 'flex items-center justify-between flex-wrap gap-2';
+      const advisoryTag = advisory
+        ? '<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-700 text-gray-300 ml-1">Advisory</span>'
+        : '';
       header.innerHTML = `
         <div class="flex items-center gap-3">
           <span class="font-semibold">${check.article} &middot; ${title}</span>
           <span class="text-xs font-medium px-2 py-0.5 rounded-full uppercase ${sevStyle}">${check.severity}</span>
+          ${advisoryTag}
         </div>
         <span class="text-sm font-bold px-3 py-1 rounded-full ${style.badge}">${check.status}</span>
       `;

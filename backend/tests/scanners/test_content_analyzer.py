@@ -184,15 +184,20 @@ class TestExtractContentFlags:
         assert flags["has_logging_config"] is True
 
     def test_telemetry_signal(self):
-        flags = extract_content_flags({"doc.md": "Telemetry is enabled for monitoring"})
+        # Phase 2: bare "telemetry" removed; compound "event logging" required
+        flags = extract_content_flags({"doc.md": "Event logging is enabled for all decisions"})
         assert flags["has_logging_config"] is True
 
-    def test_monitoring_mitigation(self):
-        flags = extract_content_flags({"doc.md": "We have monitoring dashboards for drift"})
+    def test_model_monitoring_mitigation(self):
+        flags = extract_content_flags({"doc.md": "We have model monitoring dashboards for drift"})
         assert flags["has_mitigation_plan"] is True
 
-    def test_drift_mitigation(self):
-        flags = extract_content_flags({"doc.md": "Drift detection alerts are configured"})
+    def test_drift_monitoring_mitigation(self):
+        flags = extract_content_flags({"doc.md": "Drift monitoring alerts are configured"})
+        assert flags["has_mitigation_plan"] is True
+
+    def test_drift_detection_mitigation(self):
+        flags = extract_content_flags({"doc.md": "Drift detection system in place"})
         assert flags["has_mitigation_plan"] is True
 
     def test_adversarial_testing(self):
@@ -246,7 +251,7 @@ class TestExtractContentFlags:
                 "This model uses SHAP for explainability. "
                 "Human review is required for all decisions. "
                 "Override mechanism is available via admin panel. "
-                "We run adversarial testing and monitor for drift. "
+                "We run adversarial testing and model monitoring for drift detection. "
                 "Data source is documented. Preprocessing steps are logged."
             )
         }
@@ -259,3 +264,118 @@ class TestExtractContentFlags:
         training_sub = flags["training_data_sub"]
         assert training_sub["provenance_documented"] is True
         assert training_sub["preprocessing_documented"] is True
+
+
+class TestFalsePositiveRegression:
+    """Phase 2D: verify generic keywords no longer trigger false compliance signals."""
+
+    def test_import_logging_not_detected(self):
+        flags = extract_content_flags({"app.py": "import logging\nlogging.info('started')"})
+        assert flags["has_logging_config"] is False
+
+    def test_method_override_not_detected(self):
+        flags = extract_content_flags({"base.py": "class Foo:\n    def override(self): pass"})
+        assert flags["has_override_mechanism"] is False
+
+    def test_css_override_not_detected(self):
+        flags = extract_content_flags({"styles.css": "override: hidden; color: red"})
+        assert flags["has_override_mechanism"] is False
+
+    def test_reshape_not_explainability(self):
+        flags = extract_content_flags({"model.py": "x = x.reshape(batch, -1)"})
+        assert flags["has_explainability"] is False
+
+    def test_timeline_not_explainability(self):
+        flags = extract_content_flags({"app.js": "const timeline = events.sort()"})
+        assert flags["has_explainability"] is False
+
+    def test_server_monitoring_not_mitigation(self):
+        flags = extract_content_flags({"ops.py": "monitoring server health"})
+        assert flags["has_mitigation_plan"] is False
+
+    def test_bare_drift_not_mitigation(self):
+        flags = extract_content_flags({"readme.md": "The car started to drift"})
+        assert flags["has_mitigation_plan"] is False
+
+    def test_bare_telemetry_not_logging(self):
+        flags = extract_content_flags({"analytics.py": "telemetry.track('page_view')"})
+        assert flags["has_logging_config"] is False
+
+    def test_escalate_privileges_not_escalation(self):
+        flags = extract_content_flags({"sec.py": "escalate privileges via sudo"})
+        assert flags["has_escalation_docs"] is False
+
+    def test_bare_logging_in_docs_not_detected(self):
+        flags = extract_content_flags({"docs/setup.md": "Enable logging for debugging"})
+        assert flags["has_logging_config"] is False
+
+
+class TestNewPhase3Signals:
+    """Phase 3: verify new sub-check content signals are detected."""
+
+    # Article 9
+    def test_residual_risk(self):
+        flags = extract_content_flags({"risk.md": "The residual risk is deemed acceptable."})
+        assert flags["has_residual_risk_evaluation"] is True
+
+    def test_testing_metrics_defined(self):
+        flags = extract_content_flags({"test_plan.md": "Acceptance criteria: F1 > 0.9"})
+        assert flags["has_testing_metrics_defined"] is True
+
+    # Article 10
+    def test_bias_mitigation(self):
+        flags = extract_content_flags({"data.md": "Bias mitigation through resampling."})
+        assert flags["has_bias_mitigation_docs"] is True
+
+    def test_data_gaps(self):
+        flags = extract_content_flags({"data.md": "Data gap: underrepresented minorities."})
+        assert flags["has_data_gaps_identified"] is True
+
+    # Article 11
+    def test_development_process(self):
+        flags = extract_content_flags({"design.md": "Design specification for the ML pipeline."})
+        assert flags["has_development_process_docs"] is True
+
+    def test_standards_applied(self):
+        flags = extract_content_flags({"compliance.md": "Aligned with ISO 42001."})
+        assert flags["has_standards_applied"] is True
+
+    # Article 12
+    def test_risk_event_logging(self):
+        flags = extract_content_flags({"ops.md": "Incident log captures all safety events."})
+        assert flags["has_risk_event_logging"] is True
+
+    def test_input_data_recording(self):
+        flags = extract_content_flags({"ops.md": "Request logging enabled for all API calls."})
+        assert flags["has_input_data_recording"] is True
+
+    # Article 13
+    def test_capabilities_limitations(self):
+        flags = extract_content_flags({"model_card.md": "Known limitation: low accuracy on edge cases."})
+        assert flags["has_capabilities_limitations"] is True
+
+    def test_group_performance(self):
+        flags = extract_content_flags({"eval.md": "Disaggregated metrics by demographic group."})
+        assert flags["has_group_performance_docs"] is True
+
+    # Article 14
+    def test_automation_bias(self):
+        flags = extract_content_flags({"oversight.md": "Training on automation bias awareness."})
+        assert flags["has_automation_bias_docs"] is True
+
+    def test_stop_mechanism(self):
+        flags = extract_content_flags({"oversight.md": "Emergency stop button halts all predictions."})
+        assert flags["has_stop_mechanism"] is True
+
+    # Article 15
+    def test_cybersecurity(self):
+        flags = extract_content_flags({"security.md": "Defense against data poisoning attacks."})
+        assert flags["has_cybersecurity_docs"] is True
+
+    def test_feedback_loop_prevention(self):
+        flags = extract_content_flags({"design.md": "Feedback loop detection and prevention."})
+        assert flags["has_feedback_loop_prevention"] is True
+
+    def test_error_resilience(self):
+        flags = extract_content_flags({"reliability.md": "Graceful degradation when inputs fail."})
+        assert flags["has_error_resilience_docs"] is True

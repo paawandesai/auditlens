@@ -9,6 +9,8 @@ Sub-checks:
 2. bias_examined — bias analysis conducted per Art 10.2(f-g)
 3. data_quality_metrics_logged — quality metrics exist and are recorded
 4. preprocessing_documented — data preprocessing steps are recorded
+5. bias_mitigation_documented — measures to detect/prevent biases [Art. 10(2)(g)]
+6. data_gaps_identified — identification of data gaps [Art. 10(2)(h)]
 
 Bias examination passes if: bias/fairness report exists, OR class balance data
 is within the 60/40 threshold. Fails if: no bias analysis at all, or data
@@ -20,6 +22,7 @@ from __future__ import annotations
 
 from app.schemas.compliance import CheckEvidence, ComplianceCheck, SeverityLiteral
 from app.schemas.scanner import ScannerOutput, TrainingDataStats
+from app.services.compliance.citations import ART_10
 
 # Class balance threshold: max allowed percentage for the majority class
 CLASS_BALANCE_THRESHOLD = 60
@@ -41,16 +44,20 @@ class Article10Check:
         bias_examined, imbalance_details = self._check_bias_examination(scanner_output, stats)
         quality = stats.quality_metrics_logged
         preprocessing = stats.preprocessing_documented
+        bias_mitigation = scanner_output.has_bias_mitigation_docs
+        data_gaps = scanner_output.has_data_gaps_identified
 
         sub_checks: dict[str, bool] = {
             "provenance_documented": provenance,
             "bias_examined": bias_examined,
             "data_quality_metrics_logged": quality,
             "preprocessing_documented": preprocessing,
+            "bias_mitigation_documented": bias_mitigation,
+            "data_gaps_identified": data_gaps,
         }
 
         passed = sum(1 for v in sub_checks.values() if v)
-        total = 4
+        total = len(sub_checks)
 
         if passed == total:
             status = "PASS"
@@ -60,7 +67,8 @@ class Article10Check:
             status = "PARTIAL"
 
         remediation = self._build_remediation(
-            provenance, bias_examined, quality, preprocessing, imbalance_details
+            provenance, bias_examined, quality, preprocessing,
+            bias_mitigation, data_gaps, imbalance_details,
         )
 
         # Keep sub_checks strictly dict[str, bool]; imbalance_details goes separately
@@ -126,17 +134,18 @@ class Article10Check:
             return True, None
 
         # No class balance data — check if bias analysis files exist
-        # (scanner sets has_data_documentation from bias_report*/fairness_report* files)
         if scanner_output.has_data_documentation:
             return True, None
 
         return False, None
 
     _FAILURE_DESCRIPTIONS: dict[str, str] = {
-        "provenance_documented": "no data provenance documentation",
-        "bias_examined": "no bias analysis or fairness report found",
-        "data_quality_metrics_logged": "no data quality metrics logged",
-        "preprocessing_documented": "no preprocessing documentation",
+        "provenance_documented": f"no data provenance — {ART_10['provenance']}",
+        "bias_examined": f"no bias analysis — {ART_10['bias']}",
+        "data_quality_metrics_logged": f"no quality metrics — {ART_10['quality']}",
+        "preprocessing_documented": f"no preprocessing docs — {ART_10['preprocessing']}",
+        "bias_mitigation_documented": f"no bias mitigation measures — {ART_10['bias_mitigation']}",
+        "data_gaps_identified": f"no data gaps analysis — {ART_10['data_gaps']}",
     }
 
     def _build_evidence_description(
@@ -147,7 +156,8 @@ class Article10Check:
             return (
                 "Training data governance requirements satisfied:"
                 " provenance documented, bias analysis conducted,"
-                " quality metrics logged, preprocessing documented."
+                " quality metrics logged, preprocessing documented,"
+                " bias mitigation measures in place, data gaps identified."
             )
 
         failures = [
@@ -163,6 +173,8 @@ class Article10Check:
         bias_examined: bool,
         quality: bool,
         preprocessing: bool,
+        bias_mitigation: bool,
+        data_gaps: bool,
         imbalance_details: dict | None,
     ) -> str:
         """Build actionable remediation guidance."""
@@ -171,7 +183,7 @@ class Article10Check:
         if not provenance:
             actions.append(
                 "Document training data sources, provenance chain,"
-                " and collection methodology."
+                " and collection methodology per Art. 10(2)(b)."
             )
         if not bias_examined:
             if imbalance_details:
@@ -184,15 +196,27 @@ class Article10Check:
             else:
                 actions.append(
                     "Conduct and document a bias analysis examining protected"
-                    " attributes for representativeness per Art 10.2(f-g)."
+                    " attributes for representativeness per Art. 10(2)(f-g)."
                 )
         if not quality:
             actions.append(
-                "Log data quality metrics (completeness, consistency, accuracy)."
+                "Log data quality metrics (completeness, consistency, accuracy)"
+                " per Art. 10(3)."
             )
         if not preprocessing:
             actions.append(
-                "Document all data preprocessing and transformation steps."
+                "Document all data preprocessing and transformation steps"
+                " per Art. 10(2)(e)."
+            )
+        if not bias_mitigation:
+            actions.append(
+                "Document measures to detect, prevent, and mitigate biases"
+                " per Art. 10(2)(g)."
+            )
+        if not data_gaps:
+            actions.append(
+                "Identify and document relevant data gaps or shortcomings"
+                " per Art. 10(2)(h)."
             )
 
         return " ".join(actions) if actions else ""
