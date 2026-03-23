@@ -1,4 +1,7 @@
 {
+  "rewrites": [
+    { "source": "/scanner", "destination": "/scanner.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",

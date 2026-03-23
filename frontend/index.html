@@ -4,130 +4,146 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AuditLens AI — EU AI Act Compliance Evidence</title>
+  <meta name="description" content="Scan GitHub repos and generate audit-ready compliance evidence for EU AI Act. Built for compliance officers, not developers.">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
-    /* .blur-gated { filter: blur(5px); pointer-events: none; user-select: none; } — re-enable with Stripe (Priority 5) */
+    .gradient-text { background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .hero-glow { box-shadow: 0 0 80px rgba(59, 130, 246, 0.15); }
   </style>
 </head>
 <body class="bg-gray-950 text-gray-100 min-h-screen">
 
-  <!-- Header -->
-  <header class="border-b border-gray-800 py-6">
-    <div class="max-w-4xl mx-auto px-4">
-      <h1 class="text-2xl font-bold tracking-tight">AuditLens AI</h1>
-      <p class="text-gray-400 mt-1">EU AI Act Compliance Evidence in 60 Seconds</p>
+  <!-- Nav -->
+  <nav class="border-b border-gray-800 py-4">
+    <div class="max-w-5xl mx-auto px-4 flex items-center justify-between">
+      <a href="/" class="text-xl font-bold tracking-tight">AuditLens AI</a>
+      <div class="flex items-center gap-4">
+        <a href="/scanner.html" class="text-sm text-gray-400 hover:text-white transition-colors">Scanner</a>
+        <a href="/scanner.html" class="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">Scan a Repo</a>
+      </div>
     </div>
-  </header>
+  </nav>
 
-  <!-- Main -->
-  <main class="max-w-4xl mx-auto px-4 py-10">
-
-    <!-- Scan Form -->
-    <form id="scan-form" class="flex gap-3">
-      <input
-        id="repo-url"
-        type="url"
-        required
-        placeholder="https://github.com/org/repo"
-        class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-      />
-      <button
-        type="submit"
-        id="submit-btn"
-        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-      >
-        Assess
+  <!-- Hero -->
+  <section class="max-w-5xl mx-auto px-4 pt-20 pb-16 text-center">
+    <h1 class="text-4xl sm:text-5xl font-bold leading-tight tracking-tight">
+      Prove AI Compliance to Auditors<br>
+      <span class="gradient-text">In 60 Seconds</span>
+    </h1>
+    <p class="mt-6 text-lg text-gray-400 max-w-2xl mx-auto leading-relaxed">
+      AuditLens scans your GitHub repositories and generates audit-ready compliance evidence
+      for the EU AI Act. Built for compliance officers and legal teams &mdash; not developers.
+    </p>
+    <div class="mt-10 flex items-center justify-center gap-4 flex-wrap">
+      <a href="/scanner.html" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3.5 rounded-lg text-lg transition-colors">
+        Scan Your Repo
+      </a>
+      <button id="demo-btn" class="border border-gray-600 hover:border-gray-400 text-gray-300 hover:text-white font-semibold px-8 py-3.5 rounded-lg text-lg transition-colors">
+        See Demo Result
       </button>
-    </form>
-
-    <!-- Loading State -->
-    <div id="loading" class="hidden mt-8 text-center">
-      <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-r-transparent"></div>
-      <p class="text-gray-400 mt-3">Assessing compliance evidence...</p>
     </div>
+    <p class="mt-4 text-sm text-gray-500">Free for public repos. No sign-up required.</p>
+  </section>
 
-    <!-- Error State -->
-    <div id="error" class="hidden mt-8 bg-red-900/30 border border-red-700 rounded-lg p-4">
-      <p id="error-message" class="text-red-300"></p>
-    </div>
-
-    <!-- Results -->
-    <div id="results" class="hidden mt-8 space-y-6">
-
-      <!-- Summary Banner -->
-      <div id="summary-banner" class="rounded-lg border p-6">
-        <div class="flex items-center justify-between flex-wrap gap-4">
-          <div class="flex items-center gap-3 flex-wrap">
-            <span id="overall-status" class="text-lg font-bold px-3 py-1 rounded-full"></span>
-            <span id="compliance-score" class="text-2xl font-bold"></span>
-            <span id="risk-badge" class="hidden text-sm font-bold px-3 py-1 rounded-full"></span>
-          </div>
-          <div id="summary-stats" class="text-gray-400 text-sm"></div>
-        </div>
-        <div id="frameworks-list" class="mt-4 text-sm text-gray-400"></div>
+  <!-- How it works -->
+  <section class="max-w-5xl mx-auto px-4 py-16">
+    <h2 class="text-2xl font-bold text-center mb-12">How It Works</h2>
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 text-center">
+        <div class="text-3xl mb-4">1</div>
+        <h3 class="font-semibold text-lg mb-2">Paste a GitHub URL</h3>
+        <p class="text-gray-400 text-sm">Enter any public repository URL. No clone, no install, no access tokens needed.</p>
       </div>
-
-      <!-- Detected Domains -->
-      <div id="domains-section" class="hidden rounded-lg border border-purple-800 bg-purple-950/30 p-5">
-        <h3 class="text-sm font-semibold text-purple-300 uppercase tracking-wide mb-3">Annex III Domain Classification</h3>
-        <div id="domains-list" class="space-y-2"></div>
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 text-center">
+        <div class="text-3xl mb-4">2</div>
+        <h3 class="font-semibold text-lg mb-2">Automated Scanning</h3>
+        <p class="text-gray-400 text-sm">We analyze dependencies, documentation, code patterns, and risk signals against EU AI Act articles.</p>
       </div>
-
-      <!-- Config Signals -->
-      <div id="config-signals-section" class="hidden rounded-lg border border-amber-800 bg-amber-950/30 p-5">
-        <h3 class="text-sm font-semibold text-amber-300 uppercase tracking-wide mb-3">Infrastructure AI Signals</h3>
-        <div id="config-signals-list" class="space-y-2"></div>
-      </div>
-
-      <!-- Doc Validations -->
-      <div id="doc-validations-section" class="hidden rounded-lg border border-blue-800 bg-blue-950/30 p-5">
-        <h3 class="text-sm font-semibold text-blue-300 uppercase tracking-wide mb-3">Document Completeness</h3>
-        <div id="doc-validations-list" class="space-y-3"></div>
-      </div>
-
-      <!-- Article Cards -->
-      <div id="article-cards" class="space-y-4"></div>
-
-      <!-- Export Actions -->
-      <div class="bg-gray-900 border border-gray-700 rounded-lg p-6 space-y-4">
-        <!-- PDF Download -->
-        <div>
-          <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">Audit Report</h3>
-          <button id="download-pdf-btn"
-            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            Download PDF Report
-          </button>
-        </div>
-        <!-- GRC Export -->
-        <div class="border-t border-gray-700 pt-4">
-          <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">GRC Platform Export</h3>
-          <div class="flex items-center gap-2">
-            <select id="grc-platform"
-              class="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5 text-gray-200 text-sm">
-            </select>
-            <button id="export-grc-btn"
-              class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-              Export JSON
-            </button>
-          </div>
-        </div>
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-6 text-center">
+        <div class="text-3xl mb-4">3</div>
+        <h3 class="font-semibold text-lg mb-2">Get Audit Evidence</h3>
+        <p class="text-gray-400 text-sm">Receive structured compliance reports, PDF exports, and GRC-ready JSON for Vanta, Drata, or Secureframe.</p>
       </div>
     </div>
-  </main>
+  </section>
+
+  <!-- Why AuditLens -->
+  <section class="max-w-5xl mx-auto px-4 py-16">
+    <h2 class="text-2xl font-bold text-center mb-4">Why AuditLens?</h2>
+    <p class="text-gray-400 text-center mb-12 max-w-2xl mx-auto">Developer tools catch issues at PR time. AuditLens produces the evidence your compliance team actually needs.</p>
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+        <h3 class="font-semibold text-blue-400 mb-2">For Compliance Officers</h3>
+        <p class="text-gray-400 text-sm">No CLI. No config files. Paste a URL, get a compliance report. Speak audit language, not developer jargon.</p>
+      </div>
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+        <h3 class="font-semibold text-blue-400 mb-2">GRC Platform Ready</h3>
+        <p class="text-gray-400 text-sm">Export directly to Vanta, Drata, or Secureframe. Control IDs mapped to platform-specific taxonomies.</p>
+      </div>
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+        <h3 class="font-semibold text-blue-400 mb-2">Risk-Tiered Assessment</h3>
+        <p class="text-gray-400 text-sm">Automatically classifies risk level. HIGH-risk systems get full Art. 9-15 assessment. Others get universal checks only.</p>
+      </div>
+      <div class="bg-gray-900 border border-gray-800 rounded-xl p-6">
+        <h3 class="font-semibold text-blue-400 mb-2">9 Articles, 38 Sub-Checks</h3>
+        <p class="text-gray-400 text-sm">Articles 5, 9-15, and 50. Prohibited practices, data governance, transparency, human oversight, and more.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Regulatory context -->
+  <section class="max-w-5xl mx-auto px-4 py-16">
+    <div class="bg-gradient-to-r from-red-950/50 to-gray-900 border border-red-900/50 rounded-xl p-8 text-center">
+      <h2 class="text-2xl font-bold mb-4">EU AI Act Enforcement Begins August 2026</h2>
+      <p class="text-gray-300 max-w-2xl mx-auto">
+        High-risk AI obligations carry penalties up to <strong class="text-red-400">7% of global annual turnover</strong>.
+        Colorado SB24-205 is already in effect. NYC Local Law 144 is active.
+        Every company using AI in hiring, lending, or education needs compliance evidence &mdash; yesterday.
+      </p>
+      <a href="/scanner.html" class="inline-block mt-6 bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors">
+        Check Your Compliance Now
+      </a>
+    </div>
+  </section>
+
+  <!-- Demo Result (hidden by default, shown on click) -->
+  <section id="demo-section" class="hidden max-w-5xl mx-auto px-4 py-8">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-2xl font-bold">Demo: huggingface/transformers</h2>
+      <button id="demo-close" class="text-gray-500 hover:text-white text-sm">&times; Close</button>
+    </div>
+    <p class="text-gray-400 text-sm mb-6">
+      Scan result for <a href="https://github.com/huggingface/transformers" class="text-blue-400 hover:underline" target="_blank" rel="noopener">huggingface/transformers</a>
+      &mdash; the most popular open-source ML library.
+      Classified as LIMITED risk, so only Articles 5 and 50 are scored. Articles 9&ndash;15 are shown as advisory.
+    </p>
+    <div id="demo-results" class="space-y-6"></div>
+    <div class="mt-8 text-center">
+      <a href="/scanner.html" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-8 py-3 rounded-lg transition-colors">
+        Scan Your Own Repo
+      </a>
+    </div>
+  </section>
 
   <!-- Footer -->
-  <footer class="border-t border-gray-800 py-6 mt-16">
-    <div class="max-w-4xl mx-auto px-4 text-xs text-gray-500 space-y-2">
-      <p><strong>Methodology:</strong> AuditLens performs file-presence and keyword analysis against public GitHub repositories to identify AI/ML framework usage and evaluate documentation completeness against EU AI Act Articles 9-15 (high-risk obligations).</p>
-      <p><strong>Disclaimer:</strong> This assessment is informational and does not constitute legal advice. Consult qualified legal counsel for compliance determinations.</p>
+  <footer class="border-t border-gray-800 py-8 mt-16">
+    <div class="max-w-5xl mx-auto px-4">
+      <div class="flex items-center justify-between flex-wrap gap-4 mb-4">
+        <span class="text-sm font-semibold">AuditLens AI</span>
+        <div class="flex items-center gap-4 text-sm text-gray-500">
+          <a href="/scanner.html" class="hover:text-gray-300">Scanner</a>
+          <a href="https://auditlens-9hox.onrender.com/docs" class="hover:text-gray-300" target="_blank" rel="noopener">API Docs</a>
+        </div>
+      </div>
+      <div class="text-xs text-gray-600 space-y-1">
+        <p><strong>Methodology:</strong> AuditLens performs file-presence, keyword, AST import, and call-chain analysis against GitHub repositories to evaluate compliance documentation against EU AI Act Articles 5, 9-15, and 50.</p>
+        <p><strong>Disclaimer:</strong> This assessment is informational and does not constitute legal advice. Consult qualified legal counsel for compliance determinations.</p>
+      </div>
     </div>
   </footer>
 
   <script>
-    const API_URL = window.location.hostname === 'localhost'
-      ? 'http://localhost:8000'
-      : 'https://auditlens-9hox.onrender.com';
-
+    // Shared rendering utilities (same as scanner.html)
     const ARTICLE_TITLES = {
       'EU_AI_ART_5':  'Prohibited AI Practices',
       'EU_AI_ART_9':  'Risk Management System',
@@ -139,220 +155,113 @@
       'EU_AI_ART_15': 'Accuracy, Robustness & Security',
       'EU_AI_ART_50': 'Transparency Obligations',
     };
-
-    const SEVERITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
-    const STATUS_ORDER = { FAIL: 0, PARTIAL: 1, PASS: 2 };
-
     const STATUS_STYLES = {
       FAIL:    { card: 'bg-red-900/30 border-red-700', badge: 'bg-red-600 text-white' },
       PARTIAL: { card: 'bg-yellow-900/30 border-yellow-600', badge: 'bg-yellow-600 text-white' },
       PASS:    { card: 'bg-green-900/30 border-green-700', badge: 'bg-green-600 text-white' },
     };
-
     const SEVERITY_STYLES = {
       critical: 'bg-red-700 text-white',
       high:     'bg-orange-600 text-white',
       medium:   'bg-yellow-600 text-gray-900',
       low:      'bg-gray-600 text-white',
     };
-
     const OVERALL_STYLES = {
       NON_COMPLIANT:       { bg: 'bg-red-900/40 border-red-700', text: 'bg-red-600 text-white' },
       PARTIALLY_COMPLIANT: { bg: 'bg-yellow-900/40 border-yellow-600', text: 'bg-yellow-600 text-white' },
       COMPLIANT:           { bg: 'bg-green-900/40 border-green-700', text: 'bg-green-600 text-white' },
     };
+    const SEVERITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
+    const STATUS_ORDER = { FAIL: 0, PARTIAL: 1, PASS: 2 };
 
-    const $  = (id) => document.getElementById(id);
-    const show = (id) => $(id).classList.remove('hidden');
-    const hide = (id) => $(id).classList.add('hidden');
+    // Embedded demo data — real scan of huggingface/transformers
+    const DEMO_DATA = {"repository":"https://github.com/huggingface/transformers","branch":"main","scanner_output":{"repo_url":"https://github.com/huggingface/transformers","detected_frameworks":[{"name":"torch","version":"2.2.0","confidence":0.95,"hr_relevance_score":0.3},{"name":"tensorflow","version":"2.16.0","confidence":0.95,"hr_relevance_score":0.3},{"name":"jax","version":"0.4.25","confidence":0.9,"hr_relevance_score":0.2},{"name":"transformers","version":"4.39.0","confidence":0.99,"hr_relevance_score":0.4},{"name":"tokenizers","version":"0.15.0","confidence":0.95,"hr_relevance_score":0.2}],"detected_domains":[],"doc_validations":[{"doc_type":"model_card","sections_found":["intended use","limitations","training data"],"sections_missing":["performance"],"completeness_score":0.75}],"config_signals":[],"risk_classification":{"risk_level":"LIMITED","risk_score":32,"annex_iii_category":null,"confidence":0.65,"evidence":[]}},"assessment":{"schema_version":"1.0","assessment_id":"demo","checks":[{"rule_id":"EU_AI_ART_5","rule_name":"Prohibited AI Practices","article":"Article 5","status":"PASS","severity":"critical","evidence":{"description":"No prohibited AI practice indicators detected."},"details":{"no_social_scoring":true,"no_biometric_categorisation":true,"no_emotion_inference":true},"remediation":null},{"rule_id":"EU_AI_ART_50","rule_name":"Transparency Obligations","article":"Article 50","status":"PARTIAL","severity":"high","evidence":{"description":"Transparency gaps: no synthetic content marking found \u2014 [Art. 50(2)] AI-generated or manipulated content shall be marked in a machine-readable format."},"details":{"ai_interaction_disclosed":true,"synthetic_content_marked":false,"provider_identified":true},"remediation":"Mark AI-generated content in a machine-readable format per Art. 50(2). Add watermarking or metadata tagging."}],"summary":{"total_checks":2,"passed":1,"failed":0,"partial":1,"compliance_score":79,"overall_status":"PARTIALLY_COMPLIANT","critical_failures":[]},"risk_tier":"LIMITED","applicable_articles":["Article 5","Article 50"],"advisory_checks":[{"rule_id":"EU_AI_ART_9","rule_name":"Risk Management System","article":"Article 9","status":"PARTIAL","severity":"critical","evidence":{"description":"Risk management gaps: no risk assessment, no failure modes, no mitigation plan, no residual risk evaluation."},"details":{"risk_assessment_exists":false,"failure_modes_cataloged":false,"mitigation_documented":false,"residual_risk_evaluated":false,"testing_against_metrics":true},"remediation":"Create risk assessment, catalog failure modes, document mitigation measures, and evaluate residual risks per Art. 9."},{"rule_id":"EU_AI_ART_10","rule_name":"Data Governance","article":"Article 10","status":"PARTIAL","severity":"critical","evidence":{"description":"Data governance gaps: no quality metrics, no data gaps analysis."},"details":{"provenance_documented":true,"bias_examined":true,"data_quality_metrics_logged":false,"preprocessing_documented":true,"bias_mitigation_documented":true,"data_gaps_identified":false},"remediation":"Log data quality metrics and identify data gaps per Art. 10."},{"rule_id":"EU_AI_ART_11","rule_name":"Technical Documentation","article":"Article 11","status":"PARTIAL","severity":"critical","evidence":{"description":"Technical documentation gaps: no standards referenced."},"details":{"model_card_exists":true,"architecture_documented":true,"performance_recorded":true,"development_process_documented":true,"standards_applied":false},"remediation":"List harmonised standards or common specifications applied per Annex IV."},{"rule_id":"EU_AI_ART_12","rule_name":"Record-Keeping","article":"Article 12","status":"PARTIAL","severity":"high","evidence":{"description":"Record-keeping gaps: no logging, no audit trail, no risk event logging, no input recording."},"details":{"logging_configured":false,"model_versioned":true,"audit_trail_exists":false,"risk_situation_logging":false,"input_data_recording":false},"remediation":"Configure logging, establish audit trail, log risk events, and record input data per Art. 12."},{"rule_id":"EU_AI_ART_13","rule_name":"Transparency","article":"Article 13","status":"PARTIAL","severity":"high","evidence":{"description":"Transparency gaps: no feature importance documentation."},"details":{"explainability_available":true,"feature_importance_documented":false,"user_instructions_provided":true,"capabilities_limitations_stated":true,"group_performance_documented":true},"remediation":"Document feature importance rankings per Art. 13(3)(b)(iv)."},{"rule_id":"EU_AI_ART_14","rule_name":"Human Oversight","article":"Article 14","status":"FAIL","severity":"critical","evidence":{"description":"No human oversight documentation found."},"details":{"human_in_loop_documented":false,"override_capability":false,"escalation_procedures":false,"automation_bias_awareness":false,"stop_mechanism":false},"remediation":"Document human oversight measures, override capability, escalation procedures, and stop mechanism per Art. 14."},{"rule_id":"EU_AI_ART_15","rule_name":"Accuracy, Robustness, Cybersecurity","article":"Article 15","status":"PARTIAL","severity":"high","evidence":{"description":"Gaps: no test metrics, no adversarial testing, no cybersecurity measures, no feedback loop prevention, no error resilience."},"details":{"test_metrics_logged":false,"adversarial_tested":false,"versioning_in_place":true,"cybersecurity_measures":false,"feedback_loop_prevention":false,"error_resilience":false},"remediation":"Log test metrics, conduct adversarial testing, document cybersecurity and error resilience per Art. 15."}]}};
 
-    let lastScannedUrl = '';
+    const $ = (id) => document.getElementById(id);
 
-    $('scan-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const url = $('repo-url').value.trim();
-      if (!url) return;
-      lastScannedUrl = url;
-
-      // Reset UI
-      hide('results');
-      hide('error');
-      show('loading');
-      $('submit-btn').disabled = true;
-
-      try {
-        const res = await fetch(`${API_URL}/api/v1/scans/repo`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ repository_url: url }),
-        });
-
-        if (!res.ok) {
-          const body = await res.json().catch(() => null);
-          const detail = body?.detail || '';
-          const messages = {
-            404: 'Repository not found. Check the URL and ensure it is a public repository.',
-            429: 'GitHub rate limit reached. Try again in a few minutes.',
-            502: 'Unable to reach GitHub. Please try again shortly.',
-            422: 'Invalid input. Please enter a valid GitHub repository URL.',
-          };
-          throw new Error(messages[res.status] || detail || `Unexpected error (${res.status})`);
-        }
-
-        const data = await res.json();
-        renderResults(data);
-      } catch (err) {
-        const msg = err.name === 'TypeError'
-          ? 'Connection failed. Check your internet connection or try again later.'
-          : err.message;
-        $('error-message').textContent = msg;
-        show('error');
-      } finally {
-        hide('loading');
-        $('submit-btn').disabled = false;
-      }
+    // Demo button
+    $('demo-btn').addEventListener('click', () => {
+      renderDemo(DEMO_DATA);
+      $('demo-section').classList.remove('hidden');
+      $('demo-section').scrollIntoView({ behavior: 'smooth' });
     });
 
-    function renderResults(data) {
+    $('demo-close').addEventListener('click', () => {
+      $('demo-section').classList.add('hidden');
+    });
+
+    function renderDemo(data) {
       const { assessment, scanner_output: scanner } = data;
       const { summary, checks } = assessment;
+      const container = $('demo-results');
+      container.innerHTML = '';
 
       // Summary banner
       const ostyle = OVERALL_STYLES[summary.overall_status] || OVERALL_STYLES.NON_COMPLIANT;
-      $('summary-banner').className = `rounded-lg border p-6 ${ostyle.bg}`;
-
       const statusLabel = summary.overall_status.replace(/_/g, ' ');
-      $('overall-status').className = `text-lg font-bold px-3 py-1 rounded-full ${ostyle.text}`;
-      $('overall-status').textContent = statusLabel;
+      const banner = document.createElement('div');
+      banner.className = `rounded-lg border p-6 ${ostyle.bg}`;
 
-      $('compliance-score').textContent = `${summary.compliance_score}/100`;
-
-      const critCount = summary.critical_failures.length;
-      $('summary-stats').textContent =
-        `${summary.passed}/${summary.total_checks} passing` +
-        (critCount > 0 ? ` \u00B7 ${critCount} critical failure${critCount > 1 ? 's' : ''}` : '');
-
-      // Risk badge
       const risk = scanner.risk_classification;
-      const riskBadge = $('risk-badge');
-      if (risk && risk.risk_level !== 'UNDETERMINED') {
-        const RISK_STYLES = {
-          UNACCEPTABLE: 'bg-red-800 text-white',
-          HIGH: 'bg-red-600 text-white',
-          LIMITED: 'bg-yellow-600 text-gray-900',
-          MINIMAL: 'bg-green-600 text-white',
-        };
-        riskBadge.className = `text-sm font-bold px-3 py-1 rounded-full ${RISK_STYLES[risk.risk_level] || 'bg-gray-600 text-white'}`;
-        riskBadge.textContent = `Risk: ${risk.risk_level}` + (risk.annex_iii_category ? ` (Cat ${risk.annex_iii_category})` : '') + ` ${risk.risk_score}/100`;
-        riskBadge.classList.remove('hidden');
-      } else {
-        riskBadge.classList.add('hidden');
-      }
+      const riskHtml = risk && risk.risk_level !== 'UNDETERMINED'
+        ? `<span class="text-sm font-bold px-3 py-1 rounded-full bg-red-600 text-white">Risk: ${risk.risk_level} (Cat ${risk.annex_iii_category}) ${risk.risk_score}/100</span>`
+        : '';
 
-      // Frameworks
       const fws = (scanner.detected_frameworks || []).map(f => f.name);
-      $('frameworks-list').textContent = fws.length > 0
-        ? `Frameworks detected: ${fws.join(', ')}`
-        : 'No AI/ML frameworks detected in dependency manifests.';
+      banner.innerHTML = `
+        <div class="flex items-center justify-between flex-wrap gap-4">
+          <div class="flex items-center gap-3 flex-wrap">
+            <span class="text-lg font-bold px-3 py-1 rounded-full ${ostyle.text}">${statusLabel}</span>
+            <span class="text-2xl font-bold">${summary.compliance_score}/100</span>
+            ${riskHtml}
+          </div>
+          <div class="text-gray-400 text-sm">${summary.passed}/${summary.total_checks} passing</div>
+        </div>
+        <div class="mt-4 text-sm text-gray-400">Frameworks detected: ${fws.join(', ')}</div>
+      `;
+      container.appendChild(banner);
 
-      // Detected Domains
+      // Domains
       const domains = scanner.detected_domains || [];
       if (domains.length > 0) {
-        const container = $('domains-list');
-        container.innerHTML = '';
-        for (const d of domains) {
-          const el = document.createElement('div');
-          el.className = 'flex items-center gap-2 flex-wrap';
-          el.innerHTML = `
-            <span class="text-xs font-bold px-2 py-0.5 rounded bg-purple-700 text-purple-100">${d.domain.replace(/_/g, ' ')}</span>
-            <span class="text-xs px-2 py-0.5 rounded bg-purple-900 text-purple-300">Cat ${d.annex_iii_category}</span>
-            <span class="text-xs text-purple-400">${Math.round(d.confidence * 100)}% confidence</span>
-            <span class="text-xs text-gray-500">${d.matched_keywords.slice(0, 4).join(', ')}</span>
-          `;
-          container.appendChild(el);
-        }
-        show('domains-section');
-      } else {
-        hide('domains-section');
+        const section = document.createElement('div');
+        section.className = 'rounded-lg border border-purple-800 bg-purple-950/30 p-5';
+        section.innerHTML = `
+          <h3 class="text-sm font-semibold text-purple-300 uppercase tracking-wide mb-3">Annex III Domain Classification</h3>
+          ${domains.map(d => `
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-bold px-2 py-0.5 rounded bg-purple-700 text-purple-100">${d.domain.replace(/_/g, ' ')}</span>
+              <span class="text-xs px-2 py-0.5 rounded bg-purple-900 text-purple-300">Cat ${d.annex_iii_category}</span>
+              <span class="text-xs text-purple-400">${Math.round(d.confidence * 100)}% confidence</span>
+            </div>
+          `).join('')}
+        `;
+        container.appendChild(section);
       }
 
-      // Config Signals
-      const configSignals = scanner.config_signals || [];
-      if (configSignals.length > 0) {
-        const container = $('config-signals-list');
-        container.innerHTML = '';
-        for (const s of configSignals) {
-          const el = document.createElement('div');
-          el.className = 'flex items-center gap-2 flex-wrap';
-          el.innerHTML = `
-            <span class="text-xs font-bold px-2 py-0.5 rounded bg-amber-700 text-amber-100 uppercase">${s.source}</span>
-            <span class="text-xs px-2 py-0.5 rounded bg-amber-900 text-amber-300">${s.framework_hint}</span>
-            <span class="text-xs text-gray-400">${s.detail}</span>
-          `;
-          container.appendChild(el);
-        }
-        show('config-signals-section');
-      } else {
-        hide('config-signals-section');
-      }
-
-      // Doc Validations
-      const docVals = scanner.doc_validations || [];
-      if (docVals.length > 0) {
-        const container = $('doc-validations-list');
-        container.innerHTML = '';
-        for (const v of docVals) {
-          const pct = Math.round(v.completeness_score * 100);
-          const barColor = pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500';
-          const el = document.createElement('div');
-          el.innerHTML = `
-            <div class="flex items-center justify-between mb-1">
-              <span class="text-sm text-blue-200 font-medium">${v.doc_type.replace(/_/g, ' ')}</span>
-              <span class="text-xs text-gray-400">${pct}% complete</span>
-            </div>
-            <div class="w-full bg-gray-700 rounded-full h-2 mb-1">
-              <div class="${barColor} h-2 rounded-full transition-all" style="width: ${pct}%"></div>
-            </div>
-            <div class="text-xs text-gray-500">
-              ${v.sections_found.length > 0 ? `<span class="text-green-400">Found:</span> ${v.sections_found.join(', ')}` : ''}
-              ${v.sections_missing.length > 0 ? `<span class="text-red-400 ml-2">Missing:</span> ${v.sections_missing.join(', ')}` : ''}
-            </div>
-          `;
-          container.appendChild(el);
-        }
-        show('doc-validations-section');
-      } else {
-        hide('doc-validations-section');
-      }
-
-      // Sort checks: FAIL first (by severity), then PARTIAL, then PASS
+      // Scored article cards
       const sorted = [...checks].sort((a, b) => {
         const sd = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
         if (sd !== 0) return sd;
         return (SEVERITY_ORDER[a.severity] || 3) - (SEVERITY_ORDER[b.severity] || 3);
       });
-
-      // Render scored article cards
-      const container = $('article-cards');
-      container.innerHTML = '';
-
       for (const check of sorted) {
-        container.appendChild(createArticleCard(check));
+        container.appendChild(createCard(check));
       }
 
-      // Render advisory cards (Art. 9-15 for non-HIGH risk, informational)
+      // Advisory checks
       const advisoryChecks = assessment.advisory_checks || [];
       if (advisoryChecks.length > 0) {
-        const advisoryHeader = document.createElement('div');
-        advisoryHeader.className = 'mt-6 mb-3';
-        advisoryHeader.innerHTML = `
+        const header = document.createElement('div');
+        header.className = 'mt-6 mb-3';
+        header.innerHTML = `
           <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide">Advisory Checks (Informational)</h3>
           <p class="text-xs text-gray-500 mt-1">
-            This <span class="font-semibold">${assessment.risk_tier || 'UNDETERMINED'}</span>-risk system is assessed against Articles 5 and 50.
+            This <span class="font-semibold">${assessment.risk_tier || 'LIMITED'}</span>-risk system is assessed against Articles 5 and 50.
             Articles 9\u201315 below are shown for informational purposes only.
           </p>
         `;
-        container.appendChild(advisoryHeader);
+        container.appendChild(header);
 
         const sortedAdvisory = [...advisoryChecks].sort((a, b) => {
           const sd = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
@@ -360,155 +269,66 @@
           return (SEVERITY_ORDER[a.severity] || 3) - (SEVERITY_ORDER[b.severity] || 3);
         });
         for (const check of sortedAdvisory) {
-          container.appendChild(createArticleCard(check, true));
+          const card = createCard(check);
+          card.classList.add('opacity-70');
+          container.appendChild(card);
         }
       }
 
-      show('results');
+      // Doc validations
+      const docVals = scanner.doc_validations || [];
+      if (docVals.length > 0) {
+        const section = document.createElement('div');
+        section.className = 'rounded-lg border border-blue-800 bg-blue-950/30 p-5';
+        section.innerHTML = `
+          <h3 class="text-sm font-semibold text-blue-300 uppercase tracking-wide mb-3">Document Completeness</h3>
+          ${docVals.map(v => {
+            const pct = Math.round(v.completeness_score * 100);
+            const barColor = pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500';
+            return `
+              <div>
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-sm text-blue-200 font-medium">${v.doc_type.replace(/_/g, ' ')}</span>
+                  <span class="text-xs text-gray-400">${pct}% complete</span>
+                </div>
+                <div class="w-full bg-gray-700 rounded-full h-2 mb-1">
+                  <div class="${barColor} h-2 rounded-full" style="width: ${pct}%"></div>
+                </div>
+                <div class="text-xs text-gray-500">
+                  ${v.sections_found.length > 0 ? '<span class="text-green-400">Found:</span> ' + v.sections_found.join(', ') : ''}
+                  ${v.sections_missing.length > 0 ? '<span class="text-red-400 ml-2">Missing:</span> ' + v.sections_missing.join(', ') : ''}
+                </div>
+              </div>`;
+          }).join('')}
+        `;
+        container.appendChild(section);
+      }
     }
 
-    function createArticleCard(check, advisory = false) {
-      const style = advisory
-        ? { card: 'bg-gray-900/50 border-gray-700 opacity-70', badge: 'bg-gray-600 text-white' }
-        : (STATUS_STYLES[check.status] || STATUS_STYLES.FAIL);
+    function createCard(check) {
+      const style = STATUS_STYLES[check.status] || STATUS_STYLES.FAIL;
       const sevStyle = SEVERITY_STYLES[check.severity] || SEVERITY_STYLES.medium;
       const title = ARTICLE_TITLES[check.rule_id] || check.rule_name;
-
-      // Count sub-checks
       const details = check.details || {};
       const subKeys = Object.keys(details).filter(k => typeof details[k] === 'boolean');
       const subPassed = subKeys.filter(k => details[k] === true).length;
-      const subTotal = subKeys.length;
 
       const card = document.createElement('div');
       card.className = `rounded-lg border p-5 ${style.card}`;
-
-      // Header row
-      const header = document.createElement('div');
-      header.className = 'flex items-center justify-between flex-wrap gap-2';
-      const advisoryTag = advisory
-        ? '<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-700 text-gray-300 ml-1">Advisory</span>'
-        : '';
-      header.innerHTML = `
-        <div class="flex items-center gap-3">
-          <span class="font-semibold">${check.article} &middot; ${title}</span>
-          <span class="text-xs font-medium px-2 py-0.5 rounded-full uppercase ${sevStyle}">${check.severity}</span>
-          ${advisoryTag}
+      card.innerHTML = `
+        <div class="flex items-center justify-between flex-wrap gap-2">
+          <div class="flex items-center gap-3">
+            <span class="font-semibold">${check.article} &middot; ${title}</span>
+            <span class="text-xs font-medium px-2 py-0.5 rounded-full uppercase ${sevStyle}">${check.severity}</span>
+          </div>
+          <span class="text-sm font-bold px-3 py-1 rounded-full ${style.badge}">${check.status}</span>
         </div>
-        <span class="text-sm font-bold px-3 py-1 rounded-full ${style.badge}">${check.status}</span>
+        ${subKeys.length > 0 ? `<p class="text-sm text-gray-400 mt-2">Sub-checks: ${subPassed}/${subKeys.length} passing</p>` : ''}
+        ${check.evidence?.description ? `<p class="text-sm text-gray-300 mt-3">Evidence: ${check.evidence.description}</p>` : ''}
+        ${check.remediation ? `<p class="text-sm text-gray-300 mt-2">Remediation: ${check.remediation}</p>` : ''}
       `;
-      card.appendChild(header);
-
-      // Sub-checks summary
-      if (subTotal > 0) {
-        const sub = document.createElement('p');
-        sub.className = 'text-sm text-gray-400 mt-2';
-        sub.textContent = `Sub-checks: ${subPassed}/${subTotal} passing`;
-        card.appendChild(sub);
-      }
-
-      // Evidence (visible — re-gate with Stripe in Priority 5)
-      if (check.evidence?.description) {
-        const ev = document.createElement('p');
-        ev.className = 'text-sm text-gray-300 mt-3';
-        ev.textContent = `Evidence: ${check.evidence.description}`;
-        card.appendChild(ev);
-      }
-
-      // Remediation (visible — re-gate with Stripe in Priority 5)
-      if (check.remediation) {
-        const rem = document.createElement('p');
-        rem.className = 'text-sm text-gray-300 mt-2';
-        rem.textContent = `Remediation: ${check.remediation}`;
-        card.appendChild(rem);
-      }
-
       return card;
     }
-
-    function createUpgradeOverlay() {
-      const overlay = document.createElement('div');
-      overlay.className = 'absolute inset-0 flex items-center justify-center';
-      overlay.innerHTML = `
-        <span class="text-xs bg-gray-800 border border-gray-600 text-gray-300 px-3 py-1 rounded-full cursor-default">
-          Upgrade to Pro for full details
-        </span>
-      `;
-      return overlay;
-    }
-
-    // --- PDF Download ---
-    $('download-pdf-btn').addEventListener('click', async () => {
-      if (!lastScannedUrl) return;
-      const btn = $('download-pdf-btn');
-      btn.disabled = true;
-      btn.textContent = 'Generating...';
-      try {
-        const res = await fetch(`${API_URL}/api/v1/scans/repo/pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ repository_url: lastScannedUrl }),
-        });
-        if (!res.ok) throw new Error('PDF generation failed');
-        const blob = await res.blob();
-        const disposition = res.headers.get('content-disposition') || '';
-        const match = disposition.match(/filename=([^\s;]+)/);
-        const filename = match ? match[1] : 'auditlens-report.pdf';
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = filename;
-        a.click();
-        URL.revokeObjectURL(a.href);
-      } catch (err) {
-        alert('Failed to generate PDF. Please try again.');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Download PDF Report';
-      }
-    });
-
-    // --- GRC Platform Dropdown ---
-    (async () => {
-      try {
-        const res = await fetch(`${API_URL}/api/v1/scans/export/platforms`);
-        if (!res.ok) return;
-        const data = await res.json();
-        const select = $('grc-platform');
-        for (const p of data.platforms) {
-          const opt = document.createElement('option');
-          opt.value = p;
-          opt.textContent = p.charAt(0).toUpperCase() + p.slice(1);
-          select.appendChild(opt);
-        }
-      } catch { /* silent — dropdown stays empty if backend unreachable */ }
-    })();
-
-    // --- GRC Export ---
-    $('export-grc-btn').addEventListener('click', async () => {
-      const platform = $('grc-platform').value;
-      if (!platform || !lastScannedUrl) return;
-      const btn = $('export-grc-btn');
-      btn.disabled = true;
-      try {
-        const res = await fetch(`${API_URL}/api/v1/scans/repo/export/${platform}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ repository_url: lastScannedUrl }),
-        });
-        if (!res.ok) throw new Error('Export failed');
-        const data = await res.json();
-        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-        const a = document.createElement('a');
-        a.href = URL.createObjectURL(blob);
-        a.download = `auditlens-${platform}-export.json`;
-        a.click();
-        URL.revokeObjectURL(a.href);
-      } catch (err) {
-        alert('Failed to export. Please try again.');
-      } finally {
-        btn.disabled = false;
-      }
-    });
   </script>
 </body>
 </html>

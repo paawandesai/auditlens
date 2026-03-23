@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AuditLens AI — Scan Repository</title>
+  <meta name="description" content="Scan a GitHub repository for EU AI Act compliance evidence.">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-950 text-gray-100 min-h-screen">
+
+  <!-- Nav -->
+  <nav class="border-b border-gray-800 py-4">
+    <div class="max-w-4xl mx-auto px-4 flex items-center justify-between">
+      <a href="/" class="text-xl font-bold tracking-tight">AuditLens AI</a>
+      <a href="/" class="text-sm text-gray-400 hover:text-white transition-colors">&larr; Home</a>
+    </div>
+  </nav>
+
+  <!-- Main -->
+  <main class="max-w-4xl mx-auto px-4 py-10">
+
+    <!-- Scan Form -->
+    <form id="scan-form" class="flex gap-3">
+      <input
+        id="repo-url"
+        type="url"
+        required
+        placeholder="https://github.com/org/repo"
+        class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+      />
+      <button
+        type="submit"
+        id="submit-btn"
+        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        Assess
+      </button>
+    </form>
+
+    <!-- Loading State -->
+    <div id="loading" class="hidden mt-8 text-center">
+      <div class="inline-block h-8 w-8 animate-spin rounded-full border-4 border-blue-500 border-r-transparent"></div>
+      <p class="text-gray-400 mt-3">Assessing compliance evidence...</p>
+    </div>
+
+    <!-- Error State -->
+    <div id="error" class="hidden mt-8 bg-red-900/30 border border-red-700 rounded-lg p-4">
+      <p id="error-message" class="text-red-300"></p>
+    </div>
+
+    <!-- Share Banner (shown after scan completes) -->
+    <div id="share-banner" class="hidden mt-4 bg-gray-900 border border-gray-700 rounded-lg p-3 flex items-center justify-between">
+      <span class="text-sm text-gray-400">Share this result:</span>
+      <div class="flex items-center gap-2">
+        <input id="share-url" readonly class="bg-gray-800 border border-gray-600 rounded px-3 py-1.5 text-sm text-gray-300 w-80 select-all" />
+        <button id="copy-share-btn" class="bg-gray-700 hover:bg-gray-600 text-white text-sm px-3 py-1.5 rounded transition-colors">Copy</button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div id="results" class="hidden mt-8 space-y-6">
+
+      <!-- Summary Banner -->
+      <div id="summary-banner" class="rounded-lg border p-6">
+        <div class="flex items-center justify-between flex-wrap gap-4">
+          <div class="flex items-center gap-3 flex-wrap">
+            <span id="overall-status" class="text-lg font-bold px-3 py-1 rounded-full"></span>
+            <span id="compliance-score" class="text-2xl font-bold"></span>
+            <span id="risk-badge" class="hidden text-sm font-bold px-3 py-1 rounded-full"></span>
+          </div>
+          <div id="summary-stats" class="text-gray-400 text-sm"></div>
+        </div>
+        <div id="frameworks-list" class="mt-4 text-sm text-gray-400"></div>
+      </div>
+
+      <!-- Detected Domains -->
+      <div id="domains-section" class="hidden rounded-lg border border-purple-800 bg-purple-950/30 p-5">
+        <h3 class="text-sm font-semibold text-purple-300 uppercase tracking-wide mb-3">Annex III Domain Classification</h3>
+        <div id="domains-list" class="space-y-2"></div>
+      </div>
+
+      <!-- Config Signals -->
+      <div id="config-signals-section" class="hidden rounded-lg border border-amber-800 bg-amber-950/30 p-5">
+        <h3 class="text-sm font-semibold text-amber-300 uppercase tracking-wide mb-3">Infrastructure AI Signals</h3>
+        <div id="config-signals-list" class="space-y-2"></div>
+      </div>
+
+      <!-- Doc Validations -->
+      <div id="doc-validations-section" class="hidden rounded-lg border border-blue-800 bg-blue-950/30 p-5">
+        <h3 class="text-sm font-semibold text-blue-300 uppercase tracking-wide mb-3">Document Completeness</h3>
+        <div id="doc-validations-list" class="space-y-3"></div>
+      </div>
+
+      <!-- Article Cards -->
+      <div id="article-cards" class="space-y-4"></div>
+
+      <!-- Export Actions -->
+      <div class="bg-gray-900 border border-gray-700 rounded-lg p-6 space-y-4">
+        <!-- PDF Download -->
+        <div>
+          <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">Audit Report</h3>
+          <button id="download-pdf-btn"
+            class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-5 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            Download PDF Report
+          </button>
+        </div>
+        <!-- GRC Export -->
+        <div class="border-t border-gray-700 pt-4">
+          <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">GRC Platform Export</h3>
+          <div class="flex items-center gap-2">
+            <select id="grc-platform"
+              class="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2.5 text-gray-200 text-sm">
+            </select>
+            <button id="export-grc-btn"
+              class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2.5 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              Export JSON
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-800 py-6 mt-16">
+    <div class="max-w-4xl mx-auto px-4 text-xs text-gray-500 space-y-2">
+      <p><strong>Methodology:</strong> AuditLens performs file-presence, keyword, AST import, and call-chain analysis against GitHub repositories to evaluate compliance documentation against EU AI Act Articles 5, 9-15, and 50.</p>
+      <p><strong>Disclaimer:</strong> This assessment is informational and does not constitute legal advice. Consult qualified legal counsel for compliance determinations.</p>
+    </div>
+  </footer>
+
+  <script>
+    const API_URL = window.location.hostname === 'localhost'
+      ? 'http://localhost:8000'
+      : 'https://auditlens-9hox.onrender.com';
+
+    const ARTICLE_TITLES = {
+      'EU_AI_ART_5':  'Prohibited AI Practices',
+      'EU_AI_ART_9':  'Risk Management System',
+      'EU_AI_ART_10': 'Data & Data Governance',
+      'EU_AI_ART_11': 'Technical Documentation',
+      'EU_AI_ART_12': 'Record-Keeping & Logging',
+      'EU_AI_ART_13': 'Transparency & Explainability',
+      'EU_AI_ART_14': 'Human Oversight',
+      'EU_AI_ART_15': 'Accuracy, Robustness & Security',
+      'EU_AI_ART_50': 'Transparency Obligations',
+    };
+
+    const SEVERITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
+    const STATUS_ORDER = { FAIL: 0, PARTIAL: 1, PASS: 2 };
+
+    const STATUS_STYLES = {
+      FAIL:    { card: 'bg-red-900/30 border-red-700', badge: 'bg-red-600 text-white' },
+      PARTIAL: { card: 'bg-yellow-900/30 border-yellow-600', badge: 'bg-yellow-600 text-white' },
+      PASS:    { card: 'bg-green-900/30 border-green-700', badge: 'bg-green-600 text-white' },
+    };
+
+    const SEVERITY_STYLES = {
+      critical: 'bg-red-700 text-white',
+      high:     'bg-orange-600 text-white',
+      medium:   'bg-yellow-600 text-gray-900',
+      low:      'bg-gray-600 text-white',
+    };
+
+    const OVERALL_STYLES = {
+      NON_COMPLIANT:       { bg: 'bg-red-900/40 border-red-700', text: 'bg-red-600 text-white' },
+      PARTIALLY_COMPLIANT: { bg: 'bg-yellow-900/40 border-yellow-600', text: 'bg-yellow-600 text-white' },
+      COMPLIANT:           { bg: 'bg-green-900/40 border-green-700', text: 'bg-green-600 text-white' },
+    };
+
+    const $  = (id) => document.getElementById(id);
+    const show = (id) => $(id).classList.remove('hidden');
+    const hide = (id) => $(id).classList.add('hidden');
+
+    let lastScannedUrl = '';
+    let lastScanId = '';
+
+    // --- Check for shared scan ID on load ---
+    (async () => {
+      const params = new URLSearchParams(window.location.search);
+      const scanId = params.get('id');
+      if (scanId) {
+        show('loading');
+        try {
+          const res = await fetch(`${API_URL}/api/v1/scans/${scanId}`);
+          if (res.ok) {
+            const data = await res.json();
+            lastScannedUrl = data.repository || '';
+            lastScanId = data.assessment?.assessment_id || scanId;
+            $('repo-url').value = lastScannedUrl;
+            renderResults(data);
+            showShareBanner(scanId);
+          }
+        } catch { /* silent */ }
+        hide('loading');
+      }
+    })();
+
+    // --- Scan form ---
+    $('scan-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const url = $('repo-url').value.trim();
+      if (!url) return;
+      lastScannedUrl = url;
+
+      hide('results');
+      hide('error');
+      hide('share-banner');
+      show('loading');
+      $('submit-btn').disabled = true;
+
+      try {
+        const res = await fetch(`${API_URL}/api/v1/scans/repo`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repository_url: url }),
+        });
+
+        if (!res.ok) {
+          const body = await res.json().catch(() => null);
+          const detail = body?.detail || '';
+          const messages = {
+            404: 'Repository not found. Check the URL and ensure it is a public repository.',
+            429: 'GitHub rate limit reached. Try again in a few minutes.',
+            502: 'Unable to reach GitHub. Please try again shortly.',
+            422: 'Invalid input. Please enter a valid GitHub repository URL.',
+          };
+          throw new Error(messages[res.status] || detail || `Unexpected error (${res.status})`);
+        }
+
+        const data = await res.json();
+        lastScanId = data.assessment?.assessment_id || '';
+        renderResults(data);
+
+        // Show shareable link
+        if (lastScanId) {
+          showShareBanner(lastScanId);
+          // Update URL without reload
+          const newUrl = `${window.location.pathname}?id=${lastScanId}`;
+          window.history.replaceState({}, '', newUrl);
+        }
+      } catch (err) {
+        const msg = err.name === 'TypeError'
+          ? 'Connection failed. Check your internet connection or try again later.'
+          : err.message;
+        $('error-message').textContent = msg;
+        show('error');
+      } finally {
+        hide('loading');
+        $('submit-btn').disabled = false;
+      }
+    });
+
+    function showShareBanner(scanId) {
+      const shareUrl = `${window.location.origin}/scanner.html?id=${scanId}`;
+      $('share-url').value = shareUrl;
+      show('share-banner');
+    }
+
+    $('copy-share-btn').addEventListener('click', () => {
+      $('share-url').select();
+      navigator.clipboard.writeText($('share-url').value).then(() => {
+        $('copy-share-btn').textContent = 'Copied!';
+        setTimeout(() => { $('copy-share-btn').textContent = 'Copy'; }, 2000);
+      });
+    });
+
+    function renderResults(data) {
+      const { assessment, scanner_output: scanner } = data;
+      const { summary, checks } = assessment;
+
+      // Summary banner
+      const ostyle = OVERALL_STYLES[summary.overall_status] || OVERALL_STYLES.NON_COMPLIANT;
+      $('summary-banner').className = `rounded-lg border p-6 ${ostyle.bg}`;
+
+      const statusLabel = summary.overall_status.replace(/_/g, ' ');
+      $('overall-status').className = `text-lg font-bold px-3 py-1 rounded-full ${ostyle.text}`;
+      $('overall-status').textContent = statusLabel;
+
+      $('compliance-score').textContent = `${summary.compliance_score}/100`;
+
+      const critCount = summary.critical_failures.length;
+      $('summary-stats').textContent =
+        `${summary.passed}/${summary.total_checks} passing` +
+        (critCount > 0 ? ` \u00B7 ${critCount} critical failure${critCount > 1 ? 's' : ''}` : '');
+
+      // Risk badge
+      const risk = scanner.risk_classification;
+      const riskBadge = $('risk-badge');
+      if (risk && risk.risk_level !== 'UNDETERMINED') {
+        const RISK_STYLES = {
+          UNACCEPTABLE: 'bg-red-800 text-white',
+          HIGH: 'bg-red-600 text-white',
+          LIMITED: 'bg-yellow-600 text-gray-900',
+          MINIMAL: 'bg-green-600 text-white',
+        };
+        riskBadge.className = `text-sm font-bold px-3 py-1 rounded-full ${RISK_STYLES[risk.risk_level] || 'bg-gray-600 text-white'}`;
+        riskBadge.textContent = `Risk: ${risk.risk_level}` + (risk.annex_iii_category ? ` (Cat ${risk.annex_iii_category})` : '') + ` ${risk.risk_score}/100`;
+        riskBadge.classList.remove('hidden');
+      } else {
+        riskBadge.classList.add('hidden');
+      }
+
+      // Frameworks
+      const fws = (scanner.detected_frameworks || []).map(f => f.name);
+      $('frameworks-list').textContent = fws.length > 0
+        ? `Frameworks detected: ${fws.join(', ')}`
+        : 'No AI/ML frameworks detected in dependency manifests.';
+
+      // Detected Domains
+      const domains = scanner.detected_domains || [];
+      if (domains.length > 0) {
+        const container = $('domains-list');
+        container.innerHTML = '';
+        for (const d of domains) {
+          const el = document.createElement('div');
+          el.className = 'flex items-center gap-2 flex-wrap';
+          el.innerHTML = `
+            <span class="text-xs font-bold px-2 py-0.5 rounded bg-purple-700 text-purple-100">${d.domain.replace(/_/g, ' ')}</span>
+            <span class="text-xs px-2 py-0.5 rounded bg-purple-900 text-purple-300">Cat ${d.annex_iii_category}</span>
+            <span class="text-xs text-purple-400">${Math.round(d.confidence * 100)}% confidence</span>
+            <span class="text-xs text-gray-500">${d.matched_keywords.slice(0, 4).join(', ')}</span>
+          `;
+          container.appendChild(el);
+        }
+        show('domains-section');
+      } else {
+        hide('domains-section');
+      }
+
+      // Config Signals
+      const configSignals = scanner.config_signals || [];
+      if (configSignals.length > 0) {
+        const container = $('config-signals-list');
+        container.innerHTML = '';
+        for (const s of configSignals) {
+          const el = document.createElement('div');
+          el.className = 'flex items-center gap-2 flex-wrap';
+          el.innerHTML = `
+            <span class="text-xs font-bold px-2 py-0.5 rounded bg-amber-700 text-amber-100 uppercase">${s.source}</span>
+            <span class="text-xs px-2 py-0.5 rounded bg-amber-900 text-amber-300">${s.framework_hint}</span>
+            <span class="text-xs text-gray-400">${s.detail}</span>
+          `;
+          container.appendChild(el);
+        }
+        show('config-signals-section');
+      } else {
+        hide('config-signals-section');
+      }
+
+      // Doc Validations
+      const docVals = scanner.doc_validations || [];
+      if (docVals.length > 0) {
+        const container = $('doc-validations-list');
+        container.innerHTML = '';
+        for (const v of docVals) {
+          const pct = Math.round(v.completeness_score * 100);
+          const barColor = pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500';
+          const el = document.createElement('div');
+          el.innerHTML = `
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-sm text-blue-200 font-medium">${v.doc_type.replace(/_/g, ' ')}</span>
+              <span class="text-xs text-gray-400">${pct}% complete</span>
+            </div>
+            <div class="w-full bg-gray-700 rounded-full h-2 mb-1">
+              <div class="${barColor} h-2 rounded-full transition-all" style="width: ${pct}%"></div>
+            </div>
+            <div class="text-xs text-gray-500">
+              ${v.sections_found.length > 0 ? `<span class="text-green-400">Found:</span> ${v.sections_found.join(', ')}` : ''}
+              ${v.sections_missing.length > 0 ? `<span class="text-red-400 ml-2">Missing:</span> ${v.sections_missing.join(', ')}` : ''}
+            </div>
+          `;
+          container.appendChild(el);
+        }
+        show('doc-validations-section');
+      } else {
+        hide('doc-validations-section');
+      }
+
+      // Sort checks: FAIL first (by severity), then PARTIAL, then PASS
+      const sorted = [...checks].sort((a, b) => {
+        const sd = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+        if (sd !== 0) return sd;
+        return (SEVERITY_ORDER[a.severity] || 3) - (SEVERITY_ORDER[b.severity] || 3);
+      });
+
+      // Render scored article cards
+      const container = $('article-cards');
+      container.innerHTML = '';
+
+      for (const check of sorted) {
+        container.appendChild(createArticleCard(check));
+      }
+
+      // Render advisory cards (Art. 9-15 for non-HIGH risk, informational)
+      const advisoryChecks = assessment.advisory_checks || [];
+      if (advisoryChecks.length > 0) {
+        const advisoryHeader = document.createElement('div');
+        advisoryHeader.className = 'mt-6 mb-3';
+        advisoryHeader.innerHTML = `
+          <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide">Advisory Checks (Informational)</h3>
+          <p class="text-xs text-gray-500 mt-1">
+            This <span class="font-semibold">${assessment.risk_tier || 'UNDETERMINED'}</span>-risk system is assessed against Articles 5 and 50.
+            Articles 9\u201315 below are shown for informational purposes only.
+          </p>
+        `;
+        container.appendChild(advisoryHeader);
+
+        const sortedAdvisory = [...advisoryChecks].sort((a, b) => {
+          const sd = STATUS_ORDER[a.status] - STATUS_ORDER[b.status];
+          if (sd !== 0) return sd;
+          return (SEVERITY_ORDER[a.severity] || 3) - (SEVERITY_ORDER[b.severity] || 3);
+        });
+        for (const check of sortedAdvisory) {
+          container.appendChild(createArticleCard(check, true));
+        }
+      }
+
+      show('results');
+    }
+
+    function createArticleCard(check, advisory = false) {
+      const style = advisory
+        ? { card: 'bg-gray-900/50 border-gray-700 opacity-70', badge: 'bg-gray-600 text-white' }
+        : (STATUS_STYLES[check.status] || STATUS_STYLES.FAIL);
+      const sevStyle = SEVERITY_STYLES[check.severity] || SEVERITY_STYLES.medium;
+      const title = ARTICLE_TITLES[check.rule_id] || check.rule_name;
+
+      const details = check.details || {};
+      const subKeys = Object.keys(details).filter(k => typeof details[k] === 'boolean');
+      const subPassed = subKeys.filter(k => details[k] === true).length;
+      const subTotal = subKeys.length;
+
+      const card = document.createElement('div');
+      card.className = `rounded-lg border p-5 ${style.card}`;
+
+      const header = document.createElement('div');
+      header.className = 'flex items-center justify-between flex-wrap gap-2';
+      const advisoryTag = advisory
+        ? '<span class="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-700 text-gray-300 ml-1">Advisory</span>'
+        : '';
+      header.innerHTML = `
+        <div class="flex items-center gap-3">
+          <span class="font-semibold">${check.article} &middot; ${title}</span>
+          <span class="text-xs font-medium px-2 py-0.5 rounded-full uppercase ${sevStyle}">${check.severity}</span>
+          ${advisoryTag}
+        </div>
+        <span class="text-sm font-bold px-3 py-1 rounded-full ${style.badge}">${check.status}</span>
+      `;
+      card.appendChild(header);
+
+      if (subTotal > 0) {
+        const sub = document.createElement('p');
+        sub.className = 'text-sm text-gray-400 mt-2';
+        sub.textContent = `Sub-checks: ${subPassed}/${subTotal} passing`;
+        card.appendChild(sub);
+      }
+
+      if (check.evidence?.description) {
+        const ev = document.createElement('p');
+        ev.className = 'text-sm text-gray-300 mt-3';
+        ev.textContent = `Evidence: ${check.evidence.description}`;
+        card.appendChild(ev);
+      }
+
+      if (check.remediation) {
+        const rem = document.createElement('p');
+        rem.className = 'text-sm text-gray-300 mt-2';
+        rem.textContent = `Remediation: ${check.remediation}`;
+        card.appendChild(rem);
+      }
+
+      return card;
+    }
+
+    // --- PDF Download ---
+    $('download-pdf-btn').addEventListener('click', async () => {
+      if (!lastScannedUrl) return;
+      const btn = $('download-pdf-btn');
+      btn.disabled = true;
+      btn.textContent = 'Generating...';
+      try {
+        const res = await fetch(`${API_URL}/api/v1/scans/repo/pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repository_url: lastScannedUrl }),
+        });
+        if (!res.ok) throw new Error('PDF generation failed');
+        const blob = await res.blob();
+        const disposition = res.headers.get('content-disposition') || '';
+        const match = disposition.match(/filename=([^\s;]+)/);
+        const filename = match ? match[1] : 'auditlens-report.pdf';
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } catch (err) {
+        alert('Failed to generate PDF. Please try again.');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Download PDF Report';
+      }
+    });
+
+    // --- GRC Platform Dropdown ---
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/v1/scans/export/platforms`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const select = $('grc-platform');
+        for (const p of data.platforms) {
+          const opt = document.createElement('option');
+          opt.value = p;
+          opt.textContent = p.charAt(0).toUpperCase() + p.slice(1);
+          select.appendChild(opt);
+        }
+      } catch { /* silent */ }
+    })();
+
+    // --- GRC Export ---
+    $('export-grc-btn').addEventListener('click', async () => {
+      const platform = $('grc-platform').value;
+      if (!platform || !lastScannedUrl) return;
+      const btn = $('export-grc-btn');
+      btn.disabled = true;
+      try {
+        const res = await fetch(`${API_URL}/api/v1/scans/repo/export/${platform}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ repository_url: lastScannedUrl }),
+        });
+        if (!res.ok) throw new Error('Export failed');
+        const data = await res.json();
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = `auditlens-${platform}-export.json`;
+        a.click();
+        URL.revokeObjectURL(a.href);
+      } catch (err) {
+        alert('Failed to export. Please try again.');
+      } finally {
+        btn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

@@ -4,10 +4,12 @@ POST /api/v1/scans/repo — full compliance assessment JSON
 POST /api/v1/scans/repo/pdf — audit-ready PDF report
 POST /api/v1/scans/repo/export/{platform} — GRC-formatted JSON
 GET  /api/v1/scans/export/platforms — available GRC platforms
+GET  /api/v1/scans/{scan_id} — retrieve stored scan result
 """
 
 from __future__ import annotations
 
+import time
 from io import BytesIO
 
 from fastapi import APIRouter, HTTPException
@@ -60,6 +62,30 @@ HIGH_RISK_CHECKS = [
 
 # Legacy: all checks combined (for backward compat)
 ALL_CHECKS = UNIVERSAL_CHECKS + HIGH_RISK_CHECKS
+
+
+# ---------------------------------------------------------------------------
+# In-memory scan result store (shareable links)
+# ---------------------------------------------------------------------------
+_SCAN_STORE: dict[str, dict] = {}
+_SCAN_TTL = 86400  # 24 hours
+
+
+def _store_scan(scan_id: str, data: dict) -> None:
+    """Store a scan result with timestamp. Evicts expired entries."""
+    now = time.time()
+    expired = [k for k, v in _SCAN_STORE.items() if now - v["ts"] > _SCAN_TTL]
+    for k in expired:
+        del _SCAN_STORE[k]
+    _SCAN_STORE[scan_id] = {"data": data, "ts": now}
+
+
+def _get_scan(scan_id: str) -> dict | None:
+    """Retrieve a stored scan result if not expired."""
+    entry = _SCAN_STORE.get(scan_id)
+    if entry and time.time() - entry["ts"] <= _SCAN_TTL:
+        return entry["data"]
+    return None
 
 
 class RepoScanRequest(BaseModel):
@@ -125,12 +151,14 @@ async def scan_repo(request: RepoScanRequest) -> dict:
     """Scan a public GitHub repo and return full compliance assessment."""
     scanner_output, assessment = await _run_scan(request)
 
-    return {
+    result = {
         "repository": request.repository_url,
         "branch": request.branch,
         "scanner_output": scanner_output.model_dump(),
         "assessment": assessment.model_dump(mode="json"),
     }
+    _store_scan(assessment.assessment_id, result)
+    return result
 
 
 @router.post("/repo/pdf")
@@ -181,3 +209,17 @@ async def scan_repo_export(platform: str, request: RepoScanRequest) -> dict:
 
     _, assessment = await _run_scan(request)
     return adapter.translate(assessment)
+
+
+# ---------------------------------------------------------------------------
+# Shareable scan results
+# ---------------------------------------------------------------------------
+
+
+@router.get("/{scan_id}")
+async def get_scan(scan_id: str) -> dict:
+    """Retrieve a previously stored scan result by ID (24h TTL)."""
+    result = _get_scan(scan_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Scan not found or expired")
+    return result

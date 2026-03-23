@@ -12,8 +12,28 @@ from app.routers.scans import router as scans_router
 
 app = FastAPI(
     title="AuditLens AI",
-    version="0.1.0",
-    description="Scan GitHub repositories for AI/ML compliance against EU AI Act.",
+    version="0.2.0",
+    description=(
+        "**API-first EU AI Act compliance evidence service.**\n\n"
+        "Scans GitHub repositories for AI/ML usage and produces audit-ready "
+        "compliance reports formatted for GRC platforms (Vanta, Drata, Secureframe).\n\n"
+        "## Capabilities\n"
+        "- **9 articles, 38 sub-checks**: Art. 5 (prohibited practices), Art. 9-15 "
+        "(high-risk obligations), Art. 50 (transparency)\n"
+        "- **Risk-tiered assessment**: Automatic risk classification determines which "
+        "articles are scored vs advisory\n"
+        "- **AST-based scanning**: Python import detection with file+line precision, "
+        "call-chain analysis for 4 regulated patterns\n"
+        "- **GRC export**: Vanta, Drata, Secureframe, and generic JSON formats\n"
+        "- **PDF reports**: Audit-grade compliance evidence documents\n\n"
+        "## Quick Start\n"
+        "```bash\n"
+        "curl -X POST /api/v1/scans/repo \\\n"
+        '  -H "Content-Type: application/json" \\\n'
+        '  -d \'{"repository_url": "https://github.com/org/repo"}\'\n'
+        "```"
+    ),
+    contact={"name": "AuditLens", "url": "https://auditlens.ai"},
 )
 
 _default_origins = ["http://localhost:3000", "http://localhost:5173"]

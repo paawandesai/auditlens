@@ -223,3 +223,40 @@ class TestExportEndpoint:
         )
         assert response.status_code == 400
         assert "Unknown platform" in response.json()["detail"]
+
+
+class TestGetScanEndpoint:
+
+    def test_scan_not_found(self, api_client):
+        response = api_client.get("/api/v1/scans/nonexistent-id")
+        assert response.status_code == 404
+        assert "not found" in response.json()["detail"].lower()
+
+    @respx.mock
+    def test_scan_stored_and_retrieved(self, api_client):
+        base = "https://api.github.com"
+        respx.get(f"{base}/repos/org/repo/git/trees/main?recursive=1").mock(
+            return_value=httpx.Response(200, json=TREE_RESPONSE, headers=RATE_HEADERS)
+        )
+        respx.get(f"{base}/repos/org/repo/contents/requirements.txt?ref=main").mock(
+            return_value=httpx.Response(200, json=_b64("scikit-learn\n"), headers=RATE_HEADERS)
+        )
+        respx.get(f"{base}/repos/org/repo/contents/README.md?ref=main").mock(
+            return_value=httpx.Response(200, json=_b64("# ML\n"), headers=RATE_HEADERS)
+        )
+        respx.route(method="GET", host="api.github.com").mock(
+            return_value=httpx.Response(404, json={"message": "Not Found"}, headers=RATE_HEADERS)
+        )
+
+        # Scan first
+        scan_res = api_client.post(
+            "/api/v1/scans/repo",
+            json={"repository_url": "https://github.com/org/repo"},
+        )
+        assert scan_res.status_code == 200
+        scan_id = scan_res.json()["assessment"]["assessment_id"]
+
+        # Retrieve by ID
+        get_res = api_client.get(f"/api/v1/scans/{scan_id}")
+        assert get_res.status_code == 200
+        assert get_res.json()["repository"] == "https://github.com/org/repo"
