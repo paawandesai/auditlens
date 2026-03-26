@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.scanners.domain_detector import detect_domains
+from app.scanners.domain_detector import detect_domains, WeightedKeyword
 
 
 class TestDetectDomains:
@@ -122,3 +122,83 @@ class TestDetectDomains:
         assert "insurance" in names
         match = next(d for d in domains if d.domain == "insurance")
         assert match.annex_iii_category == "5c"
+
+
+class TestWeightedScoring:
+    """Tests for weighted keyword scoring (replaces flat count threshold)."""
+
+    def test_single_strong_phrase_triggers_detection(self):
+        """A strong multi-word phrase (weight 2.0) should trigger detection alone."""
+        text = "ML-powered candidate screening tool for enterprises."
+        domains = detect_domains(text)
+        names = [d.domain for d in domains]
+        assert "employment_recruitment" in names
+        match = next(d for d in domains if d.domain == "employment_recruitment")
+        assert match.annex_iii_category == "4a"
+
+    def test_single_weak_keyword_does_not_trigger(self):
+        """A single weak keyword (weight 1.0) must NOT trigger without context."""
+        text = "Our system handles recruitment."
+        domains = detect_domains(text)
+        assert domains == []
+
+    def test_weak_keyword_plus_framework_context_triggers(self):
+        """With AI frameworks detected, a single weak keyword should trigger at low confidence."""
+        text = "Our system handles recruitment."
+        domains = detect_domains(text, has_ai_frameworks=True)
+        names = [d.domain for d in domains]
+        assert "employment_recruitment" in names
+        match = next(d for d in domains if d.domain == "employment_recruitment")
+        assert match.confidence <= 0.5, "Contextual boost should cap confidence at 0.5"
+
+    def test_two_weak_keywords_still_works(self):
+        """Backward compat: 2 weak keywords (1.0 + 1.0 = 2.0) still trigger."""
+        text = "Our recruitment platform helps hiring managers."
+        domains = detect_domains(text)
+        names = [d.domain for d in domains]
+        assert "employment_recruitment" in names
+
+    def test_strong_phrase_higher_confidence_than_two_weak(self):
+        """A strong phrase should produce higher confidence than two weak keywords."""
+        strong_text = "Resume screening and candidate screening pipeline."
+        weak_text = "Recruitment and hiring process."
+        strong_domains = detect_domains(strong_text)
+        weak_domains = detect_domains(weak_text)
+        strong_match = next(d for d in strong_domains if d.domain == "employment_recruitment")
+        weak_match = next(d for d in weak_domains if d.domain == "employment_recruitment")
+        assert strong_match.confidence >= weak_match.confidence
+
+    def test_contextual_boost_no_frameworks_no_trigger(self):
+        """Without has_ai_frameworks=True, single weak keyword still doesn't trigger."""
+        text = "Our system handles recruitment."
+        domains = detect_domains(text, has_ai_frameworks=False)
+        assert domains == []
+
+    def test_hiring_pipeline_strong_phrase(self):
+        """'hiring pipeline' as a strong phrase should trigger alone."""
+        text = "We built a hiring pipeline using machine learning."
+        domains = detect_domains(text)
+        names = [d.domain for d in domains]
+        assert "employment_recruitment" in names
+
+    def test_weighted_keyword_dataclass(self):
+        """WeightedKeyword should be a frozen dataclass with defaults."""
+        kw = WeightedKeyword("test phrase")
+        assert kw.phrase == "test phrase"
+        assert kw.weight == 1.0
+        strong = WeightedKeyword("strong phrase", weight=2.0)
+        assert strong.weight == 2.0
+
+    def test_4b_strong_phrases(self):
+        """Category 4b strong phrases should trigger detection alone."""
+        text = "Our employee assessment system uses ML for performance review."
+        domains = detect_domains(text)
+        names = [d.domain for d in domains]
+        assert "employment_management" in names
+
+    def test_4c_strong_phrases(self):
+        """Category 4c strong phrases should trigger detection alone."""
+        text = "AI-driven workplace surveillance system for offices."
+        domains = detect_domains(text)
+        names = [d.domain for d in domains]
+        assert "employment_monitoring" in names

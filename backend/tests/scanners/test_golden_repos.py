@@ -139,6 +139,23 @@ class TestSmartHireAI:
         _, assessment = await _scan_and_assess(self.REPO)
         assert assessment.summary.overall_status == "NON_COMPLIANT"
 
+    @pytest.mark.asyncio
+    async def test_employment_domain_detected(self):
+        """Hiring AI should detect employment domain (category 4a/4b/4c)."""
+        output, _ = await _scan_and_assess(self.REPO)
+        categories = {d.annex_iii_category for d in output.detected_domains}
+        cat4 = {c for c in categories if c.startswith("4")}
+        assert len(cat4) >= 1, f"Expected employment domain, got categories: {categories}"
+
+    @pytest.mark.asyncio
+    async def test_risk_level_high_or_limited(self):
+        """Hiring AI with ML frameworks should be HIGH or LIMITED risk."""
+        output, _ = await _scan_and_assess(self.REPO)
+        assert output.risk_classification is not None
+        assert output.risk_classification.risk_level in ("HIGH", "LIMITED"), (
+            f"Expected HIGH/LIMITED, got {output.risk_classification.risk_level}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Golden Repo 3: Srishtisharma7/ResumeScreener — Bare 2-file repo
@@ -194,6 +211,14 @@ class TestFlask:
         _, assessment = await _scan_and_assess(self.REPO)
         assert assessment.summary.overall_status == "NON_COMPLIANT"
 
+    @pytest.mark.asyncio
+    async def test_no_domains_detected(self):
+        """Non-ML repo should have zero Annex III domain detections."""
+        output, _ = await _scan_and_assess(self.REPO)
+        assert len(output.detected_domains) == 0, (
+            f"False positive domains: {[d.domain for d in output.detected_domains]}"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Golden Repo 5: vercel/ai-chatbot — JS/TS AI project (package.json path)
@@ -237,3 +262,57 @@ class TestVercelAIChatbot:
     async def test_overall_non_compliant(self):
         _, assessment = await _scan_and_assess(self.REPO)
         assert assessment.summary.overall_status == "NON_COMPLIANT"
+
+    @pytest.mark.asyncio
+    async def test_no_employment_domain(self):
+        """Chatbot should NOT trigger employment domain detection."""
+        output, _ = await _scan_and_assess(self.REPO)
+        employment_domains = [
+            d for d in output.detected_domains
+            if d.annex_iii_category.startswith("4")
+        ]
+        assert len(employment_domains) == 0, (
+            f"False positive employment domains: "
+            f"{[(d.domain, d.matched_keywords) for d in employment_domains]}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Golden Repo 6: jakevdp/PythonDataScienceHandbook — Pure DS (false positive guard)
+# ---------------------------------------------------------------------------
+# Textbook repo using scikit-learn, pandas, numpy, matplotlib heavily.
+# Zero employment keywords. Tests that ML frameworks alone don't trigger
+# employment domain detection via contextual boosting (false positive guard).
+
+class TestDataScienceHandbook:
+    REPO = "https://github.com/jakevdp/PythonDataScienceHandbook"
+
+    @pytest.mark.asyncio
+    async def test_ml_frameworks_detected(self):
+        """Should detect ML frameworks from imports/notebooks."""
+        output, _ = await _scan_and_assess(self.REPO)
+        names = {f.name for f in output.detected_frameworks}
+        assert len(names) >= 1, f"Expected 1+ ML frameworks, got: {names}"
+
+    @pytest.mark.asyncio
+    async def test_no_employment_domain(self):
+        """Pure data science repo should NOT trigger employment domain."""
+        output, _ = await _scan_and_assess(self.REPO)
+        employment_domains = [
+            d for d in output.detected_domains
+            if d.annex_iii_category.startswith("4")
+        ]
+        assert len(employment_domains) == 0, (
+            f"False positive employment domains: "
+            f"{[(d.domain, d.matched_keywords) for d in employment_domains]}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_risk_not_high(self):
+        """DS textbook should NOT be classified as HIGH risk."""
+        output, _ = await _scan_and_assess(self.REPO)
+        if output.risk_classification:
+            assert output.risk_classification.risk_level != "HIGH", (
+                f"False positive HIGH risk for a textbook repo: "
+                f"score={output.risk_classification.risk_score}"
+            )

@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import os
+
 import pytest
+
+# Disable auth for all tests by default (individual tests can re-enable)
+os.environ.setdefault("AUDITLENS_AUTH_ENABLED", "false")
 
 
 def pytest_addoption(parser):

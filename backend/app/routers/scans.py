@@ -1,10 +1,10 @@
 """Scan endpoints — the core API surface.
 
-POST /api/v1/scans/repo — full compliance assessment JSON
-POST /api/v1/scans/repo/pdf — audit-ready PDF report
-POST /api/v1/scans/repo/export/{platform} — GRC-formatted JSON
-GET  /api/v1/scans/export/platforms — available GRC platforms
-GET  /api/v1/scans/{scan_id} — retrieve stored scan result
+POST /api/v1/scans/repo — full compliance assessment JSON (public)
+POST /api/v1/scans/repo/pdf — audit-ready PDF report (auth required)
+POST /api/v1/scans/repo/export/{platform} — GRC-formatted JSON (auth required)
+GET  /api/v1/scans/export/platforms — available GRC platforms (public)
+GET  /api/v1/scans/{scan_id} — retrieve stored scan result (public)
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 from io import BytesIO
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
@@ -24,6 +24,8 @@ from app.scanners.github_scanner import (
 )
 from app.schemas.compliance import AssessmentResult
 from app.schemas.scanner import ScannerOutput
+from app.security.auth import AuthUser, require_auth
+from app.security.rate_limit import RATE_LIMIT_READ, RATE_LIMIT_SCAN, limiter
 from app.services.compliance.article_05 import Article05Check
 from app.services.compliance.article_09 import Article09Check
 from app.services.compliance.article_10 import Article10Check
@@ -146,14 +148,20 @@ async def _run_scan(
     return scanner_output, assessment
 
 
+# ---------------------------------------------------------------------------
+# Public endpoints (rate limited, no auth)
+# ---------------------------------------------------------------------------
+
+
 @router.post("/repo")
-async def scan_repo(request: RepoScanRequest) -> dict:
+@limiter.limit(RATE_LIMIT_SCAN)
+async def scan_repo(request: Request, body: RepoScanRequest) -> dict:
     """Scan a public GitHub repo and return full compliance assessment."""
-    scanner_output, assessment = await _run_scan(request)
+    scanner_output, assessment = await _run_scan(body)
 
     result = {
-        "repository": request.repository_url,
-        "branch": request.branch,
+        "repository": body.repository_url,
+        "branch": body.branch,
         "scanner_output": scanner_output.model_dump(),
         "assessment": assessment.model_dump(mode="json"),
     }
@@ -161,10 +169,37 @@ async def scan_repo(request: RepoScanRequest) -> dict:
     return result
 
 
+@router.get("/export/platforms")
+@limiter.limit(RATE_LIMIT_READ)
+async def list_export_platforms(request: Request) -> dict:
+    """List available GRC export platforms."""
+    return {"platforms": GRC_REGISTRY.available_platforms()}
+
+
+@router.get("/{scan_id}")
+@limiter.limit(RATE_LIMIT_READ)
+async def get_scan(request: Request, scan_id: str) -> dict:
+    """Retrieve a previously stored scan result by ID (24h TTL)."""
+    result = _get_scan(scan_id)
+    if result is None:
+        raise HTTPException(status_code=404, detail="Scan not found or expired")
+    return result
+
+
+# ---------------------------------------------------------------------------
+# Protected endpoints (rate limited + auth required)
+# ---------------------------------------------------------------------------
+
+
 @router.post("/repo/pdf")
-async def scan_repo_pdf(request: RepoScanRequest) -> StreamingResponse:
+@limiter.limit(RATE_LIMIT_SCAN)
+async def scan_repo_pdf(
+    request: Request,
+    body: RepoScanRequest,
+    user: AuthUser = Depends(require_auth),
+) -> StreamingResponse:
     """Scan a public GitHub repo and return an audit-ready PDF report."""
-    scanner_output, assessment = await _run_scan(request)
+    scanner_output, assessment = await _run_scan(body)
     pdf_bytes = generate_compliance_pdf(assessment, scanner_output)
 
     return StreamingResponse(
@@ -179,7 +214,7 @@ async def scan_repo_pdf(request: RepoScanRequest) -> StreamingResponse:
 
 
 # ---------------------------------------------------------------------------
-# GRC Export
+# GRC Export (protected)
 # ---------------------------------------------------------------------------
 
 GRC_REGISTRY = AdapterRegistry([
@@ -190,14 +225,14 @@ GRC_REGISTRY = AdapterRegistry([
 ])
 
 
-@router.get("/export/platforms")
-async def list_export_platforms() -> dict:
-    """List available GRC export platforms."""
-    return {"platforms": GRC_REGISTRY.available_platforms()}
-
-
 @router.post("/repo/export/{platform}")
-async def scan_repo_export(platform: str, request: RepoScanRequest) -> dict:
+@limiter.limit(RATE_LIMIT_SCAN)
+async def scan_repo_export(
+    request: Request,
+    platform: str,
+    body: RepoScanRequest,
+    user: AuthUser = Depends(require_auth),
+) -> dict:
     """Scan a repo and return GRC-formatted JSON for the specified platform."""
     adapter = GRC_REGISTRY.get(platform)
     if adapter is None:
@@ -207,19 +242,5 @@ async def scan_repo_export(platform: str, request: RepoScanRequest) -> dict:
             detail=f"Unknown platform '{platform}'. Available: {', '.join(available)}",
         )
 
-    _, assessment = await _run_scan(request)
+    _, assessment = await _run_scan(body)
     return adapter.translate(assessment)
-
-
-# ---------------------------------------------------------------------------
-# Shareable scan results
-# ---------------------------------------------------------------------------
-
-
-@router.get("/{scan_id}")
-async def get_scan(scan_id: str) -> dict:
-    """Retrieve a previously stored scan result by ID (24h TTL)."""
-    result = _get_scan(scan_id)
-    if result is None:
-        raise HTTPException(status_code=404, detail="Scan not found or expired")
-    return result

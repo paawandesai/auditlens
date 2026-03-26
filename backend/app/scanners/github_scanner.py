@@ -156,7 +156,10 @@ class GitHubScanner:
 
             # Pass 3.5: Domain detection (zero extra API calls — reuses content)
             combined_text = "\n".join(file_contents.values())
-            detected_domains = detect_domains(combined_text)
+            detected_domains = detect_domains(
+                combined_text,
+                has_ai_frameworks=bool(detected_frameworks),
+            )
 
             # Pass 3.6: Doc section validation (zero extra API calls — reuses content)
             doc_validations: list[DocValidation] = []
