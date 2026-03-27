@@ -186,19 +186,17 @@ async def get_scan(request: Request, scan_id: str) -> dict:
     return result
 
 
-# ---------------------------------------------------------------------------
-# Protected endpoints (rate limited + auth required)
-# ---------------------------------------------------------------------------
-
-
 @router.post("/repo/pdf")
 @limiter.limit(RATE_LIMIT_SCAN)
 async def scan_repo_pdf(
     request: Request,
     body: RepoScanRequest,
-    user: AuthUser = Depends(require_auth),
 ) -> StreamingResponse:
-    """Scan a public GitHub repo and return an audit-ready PDF report."""
+    """Scan a public GitHub repo and return an audit-ready PDF report.
+
+    Public endpoint — no auth required. PDF download is the lead-gen funnel;
+    gate with email capture on the frontend, not backend auth.
+    """
     scanner_output, assessment = await _run_scan(body)
     pdf_bytes = generate_compliance_pdf(assessment, scanner_output)
 
@@ -214,7 +212,7 @@ async def scan_repo_pdf(
 
 
 # ---------------------------------------------------------------------------
-# GRC Export (protected)
+# GRC Export (auth required — Enterprise tier)
 # ---------------------------------------------------------------------------
 
 GRC_REGISTRY = AdapterRegistry([
