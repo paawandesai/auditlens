@@ -281,10 +281,10 @@ class TestFindManifestFiles:
         result = self.scanner._find_manifest_files(tree, ["requirements.txt"])
         assert result[0] == "requirements.txt"  # root first
 
-    def test_caps_at_15(self):
-        tree = [f"dir{i}/requirements.txt" for i in range(20)]
+    def test_caps_at_30(self):
+        tree = [f"dir{i}/requirements.txt" for i in range(40)]
         result = self.scanner._find_manifest_files(tree, ["requirements.txt"])
-        assert len(result) == 15
+        assert len(result) == 30
 
     def test_case_insensitive(self):
         tree = ["REQUIREMENTS.TXT", "Setup.py"]

@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from app.routers.evidence import router as evidence_router
 from app.routers.scans import router as scans_router
 from app.routers.taxonomy import router as taxonomy_router
 from app.security.rate_limit import limiter
@@ -100,6 +101,7 @@ app.add_middleware(
 )
 
 app.include_router(scans_router)
+app.include_router(evidence_router)
 app.include_router(taxonomy_router)
 
 

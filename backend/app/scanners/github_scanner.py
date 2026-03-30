@@ -34,6 +34,7 @@ from app.scanners.js_import_scanner import (
     scan_js_imports,
     select_js_files,
 )
+from app.scanners.notebook_scanner import extract_notebook_cells, select_notebook_files
 from app.scanners.requirements_parser import RequirementsParser
 from app.schemas.scanner import (
     CallChainFinding,
@@ -68,6 +69,10 @@ CONFIG_FILES: list[str] = [
 MANIFEST_FILES: list[str] = [
     "requirements.txt", "pyproject.toml", "package.json",
     "Pipfile", "setup.cfg", "setup.py", "environment.yml",
+    # Java
+    "pom.xml", "build.gradle",
+    # Go
+    "go.mod",
 ]
 
 
@@ -111,7 +116,7 @@ class GitHubScanner:
                     file_paths = await self._fetch_tree(owner, repo, branch)
                 else:
                     raise
-            tree_flags = check_file_tree_flags(file_paths)
+            tree_flags, tree_matched_paths = check_file_tree_flags(file_paths)
 
             # Pass 2: Fetch and parse manifests (search at any depth)
             manifest_files = self._find_manifest_files(file_paths, MANIFEST_FILES)
@@ -146,13 +151,33 @@ class GitHubScanner:
                     detected_frameworks, js_import_frameworks,
                 )
 
+            # Pass 2.7: Jupyter notebook scanning (reuses import scanner)
+            nb_files = select_notebook_files(file_paths)
+            if nb_files:
+                nb_contents = await self._fetch_files(owner, repo, branch, nb_files)
+                nb_import_frameworks: list[DetectedFramework] = []
+                for filename, content in nb_contents.items():
+                    code_src, md_src = extract_notebook_cells(content)
+                    if code_src:
+                        fws, nb_imports = scan_python_imports_ast(
+                            code_src, filename=filename,
+                        )
+                        nb_import_frameworks.extend(fws)
+                        all_detected_imports.extend(nb_imports)
+                    # Markdown cells added to content for keyword analysis later
+                    if md_src:
+                        py_contents[filename] = md_src
+                detected_frameworks = merge_frameworks(
+                    detected_frameworks, nb_import_frameworks,
+                )
+
             # Pass 3: Fetch and analyze content files
             content_files = self._select_existing_files(file_paths, CONTENT_FILES)
             # Also fetch doc files discovered in tree
             doc_files = self._find_doc_files(file_paths)
             all_content_files = list(set(content_files + doc_files))
             file_contents = await self._fetch_files(owner, repo, branch, all_content_files)
-            content_flags = extract_content_flags(file_contents)
+            content_flags, content_matched_paths = extract_content_flags(file_contents)
 
             # Pass 3.5: Domain detection (zero extra API calls — reuses content)
             combined_text = "\n".join(file_contents.values())
@@ -183,6 +208,16 @@ class GitHubScanner:
                 owner, repo, branch, file_paths, file_contents,
             )
 
+            # Merge matched paths from tree and content analysis
+            all_matched_paths: dict[str, list[str]] = {}
+            for field, paths in tree_matched_paths.items():
+                all_matched_paths.setdefault(field, []).extend(paths)
+            for field, paths in content_matched_paths.items():
+                existing = all_matched_paths.get(field, [])
+                all_matched_paths.setdefault(field, []).extend(
+                    p for p in paths if p not in existing
+                )
+
             output = self._build_output(
                 repo_url=repo_url,
                 detected_frameworks=detected_frameworks,
@@ -193,6 +228,7 @@ class GitHubScanner:
                 doc_validations=doc_validations,
                 detected_imports=all_detected_imports,
                 call_chain_findings=call_chain_findings,
+                matched_paths=all_matched_paths,
             )
 
             # Pass 5: Risk classification (uses frameworks + domains)
@@ -306,7 +342,7 @@ class GitHubScanner:
         ]
         # Sort: root-level first, then by depth
         matches.sort(key=lambda p: p.count("/"))
-        return matches[:15]  # Cap to avoid excessive API calls
+        return matches[:30]  # Cap to avoid excessive API calls
 
     def _select_existing_files(
         self, tree_paths: list[str], target_files: list[str]
@@ -358,6 +394,13 @@ class GitHubScanner:
             r"^docs/.*\.rst$",
             r"^.*model.card.*$",
             r"^.*risk.assessment.*$",
+            r"^compliance/.*\.md$",
+            r"^ethics/.*\.md$",
+            r"^safety/.*\.md$",
+            r"^governance/.*\.md$",
+            r"^.*fairness.*\.md$",
+            r"^.*bias.*\.md$",
+            r"^.*transparency.*\.md$",
         ]
         results: list[str] = []
         for path in file_paths:
@@ -365,7 +408,8 @@ class GitHubScanner:
             if any(re.match(pat, lower) for pat in doc_patterns):
                 results.append(path)
         # Limit to avoid excessive fetches
-        return results[:10]
+        # Limit to avoid excessive fetches (increased from 10 for compliance-heavy repos)
+        return results[:25]
 
     def _build_output(
         self,
@@ -376,6 +420,7 @@ class GitHubScanner:
         detected_domains: list[DetectedDomain] | None = None,
         config_signals: list[ConfigSignal] | None = None,
         doc_validations: list[DocValidation] | None = None,
+        matched_paths: dict[str, list[str]] | None = None,
         detected_imports: list[DetectedImport] | None = None,
         call_chain_findings: list[CallChainFinding] | None = None,
     ) -> ScannerOutput:
@@ -403,6 +448,10 @@ class GitHubScanner:
             "has_automation_bias_docs", "has_stop_mechanism",
             "has_cybersecurity_docs", "has_feedback_loop_prevention",
             "has_error_resilience_docs",
+            # Articles 16, 17, 26, 27, 53, 55, 72 organizational/GPAI signals
+            "has_contact_info", "has_impact_assessment", "has_monitoring_config",
+            "has_incident_reporting", "has_copyright_policy", "has_qms_docs",
+            "has_conformity_assessment",
         ]
         for field in bool_fields:
             merged[field] = bool(tree_flags.get(field)) or bool(content_flags.get(field))
@@ -460,4 +509,5 @@ class GitHubScanner:
             doc_validations=doc_validations or [],
             detected_imports=detected_imports or [],
             call_chain_findings=call_chain_findings or [],
+            matched_paths=matched_paths or {},
         )

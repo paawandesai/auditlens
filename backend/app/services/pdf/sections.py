@@ -181,32 +181,31 @@ def build_article_section(
         Paragraph(f"<b>Evidence:</b> {check.evidence.description}", BODY_STYLE)
     )
 
-    # Sub-checks table
-    sub_checks = {
-        k: v for k, v in (check.details or {}).items()
-        if isinstance(v, bool)
-    }
-    if sub_checks:
-        sub_data = [["Sub-check", "Result"]]
-        for name, passed in sub_checks.items():
-            label = name.replace("_", " ").title()
-            result_text = "PASS" if passed else "FAIL"
-            sub_data.append([label, result_text])
+    # Rich sub-checks (with reasoning, article reference) — preferred
+    rich_subs = check.sub_checks if hasattr(check, "sub_checks") else []
+    if rich_subs:
+        sub_data = [["Sub-check", "Result", "Detail"]]
+        for sc in rich_subs:
+            result_text = "PASS" if sc.passed else "FAIL"
+            detail = sc.reasoning[:120]
+            if sc.article_reference:
+                detail += f" {sc.article_reference[:60]}"
+            sub_data.append([sc.description[:50], result_text, detail])
 
-        sub_table = Table(sub_data, colWidths=[3.5 * inch, 1.5 * inch])
+        sub_table = Table(sub_data, colWidths=[2.0 * inch, 0.8 * inch, 3.0 * inch])
         style_cmds = [
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f0f0f0")),
             ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
             ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
-            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("FONTSIZE", (0, 0), (-1, -1), 8),
             ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dddddd")),
-            ("TOPPADDING", (0, 0), (-1, -1), 4),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+            ("LEFTPADDING", (0, 0), (-1, -1), 4),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ]
-        # Color-code pass/fail cells
-        for row_idx, (_, passed) in enumerate(sub_checks.items(), start=1):
-            cell_color = STATUS_COLORS["PASS"] if passed else STATUS_COLORS["FAIL"]
+        for row_idx, sc in enumerate(rich_subs, start=1):
+            cell_color = STATUS_COLORS["PASS"] if sc.passed else STATUS_COLORS["FAIL"]
             style_cmds.append(("BACKGROUND", (1, row_idx), (1, row_idx), cell_color))
             style_cmds.append(("TEXTCOLOR", (1, row_idx), (1, row_idx), colors.white))
             style_cmds.append(("ALIGN", (1, row_idx), (1, row_idx), "CENTER"))
@@ -214,6 +213,39 @@ def build_article_section(
         sub_table.setStyle(TableStyle(style_cmds))
         flowables.append(Spacer(1, 4))
         flowables.append(sub_table)
+    else:
+        # Fallback: old boolean sub-checks from details dict
+        bool_subs = {
+            k: v for k, v in (check.details or {}).items()
+            if isinstance(v, bool)
+        }
+        if bool_subs:
+            sub_data = [["Sub-check", "Result"]]
+            for name, passed in bool_subs.items():
+                label = name.replace("_", " ").title()
+                result_text = "PASS" if passed else "FAIL"
+                sub_data.append([label, result_text])
+
+            sub_table = Table(sub_data, colWidths=[3.5 * inch, 1.5 * inch])
+            style_cmds = [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f0f0f0")),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+                ("FONTSIZE", (0, 0), (-1, -1), 9),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dddddd")),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ]
+            for row_idx, (_, passed) in enumerate(bool_subs.items(), start=1):
+                cell_color = STATUS_COLORS["PASS"] if passed else STATUS_COLORS["FAIL"]
+                style_cmds.append(("BACKGROUND", (1, row_idx), (1, row_idx), cell_color))
+                style_cmds.append(("TEXTCOLOR", (1, row_idx), (1, row_idx), colors.white))
+                style_cmds.append(("ALIGN", (1, row_idx), (1, row_idx), "CENTER"))
+
+            sub_table.setStyle(TableStyle(style_cmds))
+            flowables.append(Spacer(1, 4))
+            flowables.append(sub_table)
 
     # Remediation
     if check.remediation:

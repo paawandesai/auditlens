@@ -14,7 +14,7 @@ Sub-checks:
 
 from __future__ import annotations
 
-from app.schemas.compliance import CheckEvidence, ComplianceCheck, SeverityLiteral
+from app.schemas.compliance import CheckEvidence, ComplianceCheck, SeverityLiteral, SubCheckDetail
 from app.schemas.scanner import ScannerOutput
 from app.services.compliance.citations import ART_9
 
@@ -26,6 +26,43 @@ class Article09Check:
     rule_name: str = "Risk Management System"
     article: str = "Article 9"
     severity: SeverityLiteral = "critical"
+
+    _SUB_CHECK_META: dict[str, tuple[str, list[str], str]] = {
+        "risk_assessment_exists": (
+            "Risk assessment documentation present in repository",
+            ["RISK_ASSESSMENT.md", "risk_assessment/*", "docs/risk*"],
+            ART_9["risk_assessment"],
+        ),
+        "failure_modes_cataloged": (
+            "Failure modes identified and documented",
+            ["tests/risk/*", "tests/safety/*"],
+            ART_9["failure_modes"],
+        ),
+        "mitigation_documented": (
+            "Risk mitigation measures documented",
+            ["docs/monitoring*", "docs/risk*"],
+            ART_9["mitigation"],
+        ),
+        "residual_risk_evaluated": (
+            "Residual risk evaluated and judged acceptable",
+            ["docs/risk/*", "RISK_ASSESSMENT.md"],
+            ART_9["residual_risk"],
+        ),
+        "testing_against_metrics": (
+            "Testing against prior-defined metrics documented",
+            ["docs/testing/*", "tests/acceptance/*"],
+            ART_9["testing_metrics"],
+        ),
+    }
+
+    # Map sub-check IDs to scanner field names for matched_paths lookup.
+    _SCANNER_FIELD_MAP: dict[str, str] = {
+        "risk_assessment_exists": "has_risk_assessment",
+        "failure_modes_cataloged": "has_failure_modes_doc",
+        "mitigation_documented": "has_mitigation_plan",
+        "residual_risk_evaluated": "has_residual_risk_evaluation",
+        "testing_against_metrics": "has_testing_metrics_defined",
+    }
 
     def evaluate(self, scanner_output: ScannerOutput) -> ComplianceCheck:
         risk_assessment = scanner_output.has_risk_assessment
@@ -48,6 +85,42 @@ class Article09Check:
 
         remediation = self._build_remediation(sub_checks) if status != "PASS" else None
 
+        rich_sub_checks: list[SubCheckDetail] = []
+        for check_id, value in sub_checks.items():
+            description, default_locations, article_ref = self._SUB_CHECK_META[check_id]
+            scanner_field = self._SCANNER_FIELD_MAP[check_id]
+            actual_paths = scanner_output.matched_paths.get(scanner_field, [])
+            reasoning = (
+                f"Found: {', '.join(actual_paths)}"
+                if value and actual_paths
+                else f"Evidence detected via content analysis — {description.lower()}"
+                if value
+                else f"No evidence for {check_id.replace('_', ' ')} found. Expected files: {', '.join(default_locations)}."
+            )
+            rich_sub_checks.append(SubCheckDetail(
+                id=check_id,
+                description=description,
+                passed=value,
+                reasoning=reasoning,
+                locations=actual_paths if value and actual_paths else default_locations,
+                article_reference=article_ref,
+            ))
+
+        evidence_locations = [
+            path
+            for sc in rich_sub_checks
+            if sc.passed
+            for path in sc.locations
+        ]
+
+        overall_reasoning = (
+            "Article 9 requires a risk management system throughout the AI system"
+            f" lifecycle. This repository shows {passed} of {total} risk management"
+            " signals, indicating "
+            + ("full" if passed == total else "partial" if passed > 0 else "no")
+            + " risk management documentation."
+        )
+
         return ComplianceCheck(
             rule_id=self.rule_id,
             rule_name=self.rule_name,
@@ -60,6 +133,9 @@ class Article09Check:
             ),
             details=sub_checks,
             remediation=remediation,
+            reasoning=overall_reasoning,
+            evidence_locations=evidence_locations,
+            sub_checks=rich_sub_checks,
         )
 
     _FAILURE_DESCRIPTIONS: dict[str, str] = {

@@ -20,7 +20,7 @@ work but don't publish raw class statistics.
 
 from __future__ import annotations
 
-from app.schemas.compliance import CheckEvidence, ComplianceCheck, SeverityLiteral
+from app.schemas.compliance import CheckEvidence, ComplianceCheck, SeverityLiteral, SubCheckDetail
 from app.schemas.scanner import ScannerOutput, TrainingDataStats
 from app.services.compliance.citations import ART_10
 
@@ -78,6 +78,85 @@ class Article10Check:
         if imbalance_details:
             details["imbalance_details"] = imbalance_details
 
+        sub_check_meta: dict[str, tuple[str, list[str], str]] = {
+            "provenance_documented": (
+                "Training data provenance and sources documented",
+                ["data_card/*", "dataset_card/*", "datasheet/*"],
+                ART_10["provenance"],
+            ),
+            "bias_examined": (
+                "Bias analysis conducted on training data",
+                ["docs/fairness/*", "docs/bias/*"],
+                ART_10["bias"],
+            ),
+            "data_quality_metrics_logged": (
+                "Data quality metrics recorded",
+                ["data_card/*", "docs/data/*"],
+                ART_10["quality"],
+            ),
+            "preprocessing_documented": (
+                "Data preprocessing steps documented",
+                ["data_card/*", "docs/data/*"],
+                ART_10["preprocessing"],
+            ),
+            "bias_mitigation_documented": (
+                "Bias mitigation measures documented",
+                ["docs/fairness/*", "docs/bias/*"],
+                ART_10["bias_mitigation"],
+            ),
+            "data_gaps_identified": (
+                "Data gaps and shortcomings identified",
+                ["data_card/*", "docs/data/*"],
+                ART_10["data_gaps"],
+            ),
+        }
+
+        # Map sub-check IDs to scanner field names for matched_paths lookup.
+        scanner_field_map: dict[str, str] = {
+            "provenance_documented": "has_data_documentation",
+            "bias_examined": "has_data_documentation",
+            "data_quality_metrics_logged": "has_data_documentation",
+            "preprocessing_documented": "has_data_documentation",
+            "bias_mitigation_documented": "has_bias_mitigation_docs",
+            "data_gaps_identified": "has_data_gaps_identified",
+        }
+
+        rich_sub_checks: list[SubCheckDetail] = []
+        for check_id, value in sub_checks.items():
+            description, default_locations, article_ref = sub_check_meta[check_id]
+            scanner_field = scanner_field_map[check_id]
+            actual_paths = scanner_output.matched_paths.get(scanner_field, [])
+            reasoning = (
+                f"Found: {', '.join(actual_paths)}"
+                if value and actual_paths
+                else f"Evidence detected via content analysis — {description.lower()}"
+                if value
+                else f"No evidence for {check_id.replace('_', ' ')} found. Expected files: {', '.join(default_locations)}."
+            )
+            rich_sub_checks.append(SubCheckDetail(
+                id=check_id,
+                description=description,
+                passed=value,
+                reasoning=reasoning,
+                locations=actual_paths if value and actual_paths else default_locations,
+                article_reference=article_ref,
+            ))
+
+        evidence_locations = [
+            path
+            for sc in rich_sub_checks
+            if sc.passed
+            for path in sc.locations
+        ]
+
+        overall_reasoning = (
+            "Article 10 requires training, validation, and testing data sets to be"
+            " relevant, representative, and free of errors. This repository shows"
+            f" {passed} of {total} data governance signals, indicating "
+            + ("full" if passed == total else "partial" if passed > 0 else "no")
+            + " data governance documentation."
+        )
+
         return ComplianceCheck(
             rule_id=self.rule_id,
             rule_name=self.rule_name,
@@ -90,6 +169,9 @@ class Article10Check:
             ),
             details=details,
             remediation=remediation if status != "PASS" else None,
+            reasoning=overall_reasoning,
+            evidence_locations=evidence_locations,
+            sub_checks=rich_sub_checks,
         )
 
     def _check_provenance(

@@ -20,21 +20,58 @@
   <!-- Main -->
   <main class="max-w-4xl mx-auto px-4 py-10">
 
-    <!-- Scan Form -->
-    <form id="scan-form" class="flex gap-3">
-      <input
-        id="repo-url"
-        type="url"
-        required
-        placeholder="https://github.com/org/repo"
-        class="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-      />
+    <!-- Scan Form — Multi-step -->
+    <form id="scan-form" class="space-y-4">
+      <!-- Step 1: Repository -->
+      <div class="bg-gray-900 border border-gray-700 rounded-lg p-4">
+        <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">Step 1: Repository</h3>
+        <div class="flex gap-3">
+          <input
+            id="repo-url"
+            type="url"
+            placeholder="https://github.com/org/repo"
+            class="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-4 py-3 text-gray-100 placeholder-gray-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          />
+        </div>
+        <label class="flex items-center gap-2 mt-2 text-sm text-gray-400 cursor-pointer">
+          <input type="checkbox" id="deployer-mode" class="rounded bg-gray-700 border-gray-600">
+          I'm a deployer — no source code repository
+        </label>
+        <p id="deployer-hint" class="hidden mt-1 text-xs text-gray-500">Risk level will be auto-inferred from your uploaded documents.</p>
+      </div>
+
+      <!-- Step 2: Supporting Documents -->
+      <div class="bg-gray-900 border border-gray-700 rounded-lg p-4">
+        <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">Step 2: Supporting Documents <span class="text-gray-500 font-normal">(optional)</span></h3>
+        <p class="text-xs text-gray-500 mb-3">Upload compliance documents (QMS, FRIA, risk assessments, etc.) to improve assessment accuracy.</p>
+        <div class="flex gap-2 mb-3">
+          <select id="doc-type-select" class="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-200 flex-1">
+            <option value="qms">Quality Management System</option>
+            <option value="fria">Fundamental Rights Impact Assessment</option>
+            <option value="risk_assessment">Risk Assessment</option>
+            <option value="conformity">Conformity Assessment</option>
+            <option value="monitoring_plan">Monitoring Plan</option>
+            <option value="incident_procedure">Incident Procedure</option>
+            <option value="data_governance">Data Governance</option>
+            <option value="model_card">Model Card / Technical Docs</option>
+            <option value="human_oversight">Human Oversight</option>
+            <option value="transparency">Transparency / Disclosure</option>
+          </select>
+          <label class="bg-gray-700 hover:bg-gray-600 text-white text-sm px-4 py-2 rounded-lg cursor-pointer transition-colors flex items-center gap-1">
+            Add Files
+            <input type="file" id="doc-file-input" accept=".pdf,.docx,.md,.txt" multiple class="hidden" />
+          </label>
+        </div>
+        <div id="uploaded-docs" class="space-y-2"></div>
+      </div>
+
+      <!-- Assess Button -->
       <button
         type="submit"
         id="submit-btn"
-        class="bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Assess
+        Assess Compliance
       </button>
     </form>
 
@@ -119,13 +156,22 @@
           </div>
         </div>
       </div>
+
+      <!-- Jurisdictions -->
+      <div id="jurisdictions-section" class="hidden">
+        <div class="bg-gray-900 border border-gray-700 rounded-lg p-6">
+          <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-1">Global AI Compliance Coverage</h3>
+          <p class="text-xs text-gray-500 mb-4">Scan results mapped against the EU AI Act. Additional jurisdictions coming soon.</p>
+          <div id="jurisdictions-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2"></div>
+        </div>
+      </div>
     </div>
   </main>
 
   <!-- Footer -->
   <footer class="border-t border-gray-800 py-6 mt-16">
     <div class="max-w-4xl mx-auto px-4 text-xs text-gray-500 space-y-2">
-      <p><strong>Methodology:</strong> AuditLens performs file-presence, keyword, AST import, and call-chain analysis against GitHub repositories to evaluate compliance documentation against EU AI Act Articles 5, 9-15, and 50.</p>
+      <p><strong>Methodology:</strong> AuditLens assesses all 18 company-facing EU AI Act articles (5-6, 8-17, 26-27, 50, 53, 55, 72) using file-presence, keyword, AST import, and call-chain analysis. Each sub-check maps to a specific article paragraph with reasoning and expected file locations.</p>
       <p><strong>Disclaimer:</strong> This assessment is informational and does not constitute legal advice. Consult qualified legal counsel for compliance determinations.</p>
     </div>
   </footer>
@@ -137,6 +183,8 @@
 
     const ARTICLE_TITLES = {
       'EU_AI_ART_5':  'Prohibited AI Practices',
+      'EU_AI_ART_6':  'Classification Rules',
+      'EU_AI_ART_8':  'Compliance with Requirements',
       'EU_AI_ART_9':  'Risk Management System',
       'EU_AI_ART_10': 'Data & Data Governance',
       'EU_AI_ART_11': 'Technical Documentation',
@@ -144,7 +192,14 @@
       'EU_AI_ART_13': 'Transparency & Explainability',
       'EU_AI_ART_14': 'Human Oversight',
       'EU_AI_ART_15': 'Accuracy, Robustness & Security',
+      'EU_AI_ART_16': 'Provider Obligations',
+      'EU_AI_ART_17': 'Quality Management System',
+      'EU_AI_ART_26': 'Deployer Obligations',
+      'EU_AI_ART_27': 'Fundamental Rights Impact Assessment',
       'EU_AI_ART_50': 'Transparency Obligations',
+      'EU_AI_ART_53': 'General-Purpose AI Obligations',
+      'EU_AI_ART_55': 'Systemic Risk GPAI Obligations',
+      'EU_AI_ART_72': 'Post-Market Monitoring',
     };
 
     const SEVERITY_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -175,6 +230,139 @@
 
     let lastScannedUrl = '';
     let lastScanId = '';
+    let uploadedEvidence = []; // {evidence_id, filename, doc_type}
+
+    // --- Deployer mode toggle ---
+    $('deployer-mode').addEventListener('change', (e) => {
+      const repoInput = $('repo-url');
+      if (e.target.checked) {
+        repoInput.disabled = true;
+        repoInput.value = '';
+        repoInput.placeholder = 'No repository (deployer mode)';
+        show('deployer-hint');
+      } else {
+        repoInput.disabled = false;
+        repoInput.placeholder = 'https://github.com/org/repo';
+        hide('deployer-hint');
+      }
+    });
+
+    // --- Auto-detect doc type from filename ---
+    function detectDocType(filename) {
+      const lower = filename.toLowerCase();
+      const rules = [
+        [/qms|quality.management|quality.policy/, 'qms'],
+        [/fria|fundamental.rights|impact.assessment/, 'fria'],
+        [/risk.assessment|risk.analysis|risk.register|risk.management/, 'risk_assessment'],
+        [/conformity|declaration.of.conformity|ce.marking/, 'conformity'],
+        [/monitoring|post.market/, 'monitoring_plan'],
+        [/incident|serious.incident/, 'incident_procedure'],
+        [/data.governance|data.quality|data.card|data.lineage/, 'data_governance'],
+        [/model.card|technical.doc|model.doc/, 'model_card'],
+        [/human.oversight|override|escalation/, 'human_oversight'],
+        [/transparency|disclosure/, 'transparency'],
+      ];
+      for (const [pattern, type] of rules) {
+        if (pattern.test(lower)) return type;
+      }
+      return null;
+    }
+
+    const DOC_TYPE_LABELS = {
+      qms: 'Quality Management System',
+      fria: 'Fundamental Rights Impact Assessment',
+      risk_assessment: 'Risk Assessment',
+      conformity: 'Conformity Assessment',
+      monitoring_plan: 'Monitoring Plan',
+      incident_procedure: 'Incident Procedure',
+      data_governance: 'Data Governance',
+      model_card: 'Model Card / Technical Docs',
+      human_oversight: 'Human Oversight',
+      transparency: 'Transparency / Disclosure',
+    };
+
+    // --- File upload handler (multi-file + auto-detect + dedup) ---
+    $('doc-file-input').addEventListener('change', async (e) => {
+      const files = Array.from(e.target.files);
+      if (!files.length) return;
+
+      const fallbackDocType = $('doc-type-select').value;
+      const docsContainer = $('uploaded-docs');
+
+      for (const file of files) {
+        // Duplicate check
+        if (uploadedEvidence.some(ev => ev.filename === file.name)) {
+          const dupEl = document.createElement('div');
+          dupEl.className = 'bg-yellow-900/30 border border-yellow-700 rounded p-2 text-sm text-yellow-300';
+          dupEl.textContent = `Skipped: ${file.name} (already uploaded)`;
+          docsContainer.appendChild(dupEl);
+          setTimeout(() => dupEl.remove(), 3000);
+          continue;
+        }
+
+        // Auto-detect doc type or use dropdown fallback
+        const detectedType = detectDocType(file.name);
+        const docType = detectedType || fallbackDocType;
+        const autoTag = detectedType ? ' (auto-detected)' : '';
+
+        // Show uploading state
+        const uploadingEl = document.createElement('div');
+        uploadingEl.className = 'bg-gray-800 rounded p-2 flex items-center gap-2 text-sm text-gray-300';
+        uploadingEl.innerHTML = `<span class="animate-pulse">Analyzing ${file.name}...</span>`;
+        docsContainer.appendChild(uploadingEl);
+
+        try {
+          const formData = new FormData();
+          formData.append('file', file);
+          formData.append('doc_type', docType);
+
+          const res = await fetch(`${API_URL}/api/v1/evidence/upload`, {
+            method: 'POST',
+            body: formData,
+          });
+
+          if (!res.ok) {
+            const body = await res.json().catch(() => null);
+            throw new Error(body?.detail || 'Upload failed');
+          }
+
+          const data = await res.json();
+          uploadedEvidence.push({
+            evidence_id: data.evidence_id,
+            filename: data.filename,
+            doc_type: docType,
+            articles: data.articles_helped || [],
+            coverage: data.keyword_analysis?.coverage_score || 0,
+          });
+
+          const coveragePct = Math.round((data.keyword_analysis?.coverage_score || 0) * 100);
+          const barColor = coveragePct >= 70 ? 'bg-green-500' : coveragePct >= 40 ? 'bg-yellow-500' : 'bg-red-500';
+          const typeLabel = DOC_TYPE_LABELS[docType] || docType;
+          uploadingEl.className = 'bg-gray-800 rounded p-3 text-sm';
+          uploadingEl.innerHTML = `
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-gray-200 font-medium">${file.name}</span>
+              <button onclick="this.parentElement.parentElement.remove(); uploadedEvidence = uploadedEvidence.filter(e => e.evidence_id !== '${data.evidence_id}')" class="text-gray-500 hover:text-red-400 text-xs">Remove</button>
+            </div>
+            <div class="flex items-center gap-2 text-xs text-gray-400">
+              <span class="px-1.5 py-0.5 rounded bg-blue-900 text-blue-300">${typeLabel}${autoTag}</span>
+              <span>Helps: ${(data.articles_helped || []).join(', ')}</span>
+            </div>
+            <div class="mt-1.5 w-full bg-gray-700 rounded-full h-1.5">
+              <div class="${barColor} h-1.5 rounded-full" style="width: ${coveragePct}%"></div>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">${data.keyword_analysis?.summary || 'Analyzed'}</p>
+          `;
+        } catch (err) {
+          uploadingEl.className = 'bg-red-900/30 border border-red-700 rounded p-2 text-sm text-red-300';
+          uploadingEl.textContent = `Failed: ${file.name} — ${err.message}`;
+          setTimeout(() => uploadingEl.remove(), 5000);
+        }
+      }
+
+      // Reset file input
+      e.target.value = '';
+    });
 
     // --- Check for shared scan ID on load ---
     (async () => {
@@ -200,9 +388,22 @@
     // --- Scan form ---
     $('scan-form').addEventListener('submit', async (e) => {
       e.preventDefault();
+      const isDeployer = $('deployer-mode').checked;
       const url = $('repo-url').value.trim();
-      if (!url) return;
-      lastScannedUrl = url;
+
+      if (!isDeployer && !url) {
+        $('error-message').textContent = 'Enter a GitHub repository URL or enable deployer mode.';
+        show('error');
+        return;
+      }
+
+      if (isDeployer && uploadedEvidence.length === 0) {
+        $('error-message').textContent = 'Upload at least one compliance document for deployer mode.';
+        show('error');
+        return;
+      }
+
+      lastScannedUrl = url || 'deployer://no-repo';
 
       hide('results');
       hide('error');
@@ -211,10 +412,23 @@
       $('submit-btn').disabled = true;
 
       try {
-        const res = await fetch(`${API_URL}/api/v1/scans/repo`, {
+        // Use /repo/complete if evidence uploaded, otherwise /repo for backward compat
+        const hasEvidence = uploadedEvidence.length > 0;
+        const endpoint = hasEvidence || isDeployer
+          ? `${API_URL}/api/v1/scans/repo/complete`
+          : `${API_URL}/api/v1/scans/repo`;
+
+        const requestBody = hasEvidence || isDeployer
+          ? {
+              repository_url: isDeployer ? null : url,
+              evidence_ids: uploadedEvidence.map(e => e.evidence_id),
+            }
+          : { repository_url: url };
+
+        const res = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ repository_url: url }),
+          body: JSON.stringify(requestBody),
         });
 
         if (!res.ok) {
@@ -222,9 +436,9 @@
           const detail = body?.detail || '';
           const messages = {
             404: 'Repository not found. Check the URL and ensure it is a public repository.',
-            429: 'GitHub rate limit reached. Try again in a few minutes.',
+            429: 'Rate limit reached. Try again in a few minutes.',
             502: 'Unable to reach GitHub. Please try again shortly.',
-            422: 'Invalid input. Please enter a valid GitHub repository URL.',
+            422: 'Invalid input. Please check your entries.',
           };
           throw new Error(messages[res.status] || detail || `Unexpected error (${res.status})`);
         }
@@ -233,10 +447,8 @@
         lastScanId = data.assessment?.assessment_id || '';
         renderResults(data);
 
-        // Show shareable link
         if (lastScanId) {
           showShareBanner(lastScanId);
-          // Update URL without reload
           const newUrl = `${window.location.pathname}?id=${lastScanId}`;
           window.history.replaceState({}, '', newUrl);
         }
@@ -418,6 +630,7 @@
       }
 
       show('results');
+      loadJurisdictions();
     }
 
     function createArticleCard(check, advisory = false) {
@@ -431,10 +644,12 @@
       const subKeys = Object.keys(details).filter(k => typeof details[k] === 'boolean');
       const subPassed = subKeys.filter(k => details[k] === true).length;
       const subTotal = subKeys.length;
+      const richSubChecks = check.sub_checks || [];
 
       const card = document.createElement('div');
       card.className = `rounded-lg border p-5 ${style.card}`;
 
+      // Header row
       const header = document.createElement('div');
       header.className = 'flex items-center justify-between flex-wrap gap-2';
       const advisoryTag = advisory
@@ -457,7 +672,95 @@
         card.appendChild(sub);
       }
 
-      if (check.evidence?.description) {
+      // Reasoning (overall article explanation)
+      if (check.reasoning) {
+        const reason = document.createElement('p');
+        reason.className = 'text-sm text-gray-300 mt-3 italic';
+        reason.textContent = check.reasoning;
+        card.appendChild(reason);
+      }
+
+      // Evidence locations (capped display with expand)
+      const locs = check.evidence_locations || [];
+      if (locs.length > 0) {
+        const MAX_SHOW = 5;
+        const locEl = document.createElement('div');
+        locEl.className = 'text-xs text-green-400 mt-2';
+        const shown = locs.slice(0, MAX_SHOW);
+        const hidden = locs.slice(MAX_SHOW);
+        let html = `<span class="font-semibold">Evidence found in:</span> ${shown.map(l => `<code class="bg-gray-800 px-1 rounded">${l}</code>`).join(' ')}`;
+        if (hidden.length > 0) {
+          const hid = `loc-${check.rule_id}-${advisory ? 'a' : 's'}`;
+          html += ` <button onclick="document.getElementById('${hid}').classList.toggle('hidden')" class="text-green-500 hover:text-green-300 underline">+${hidden.length} more</button>`;
+          html += `<span id="${hid}" class="hidden"> ${hidden.map(l => `<code class="bg-gray-800 px-1 rounded">${l}</code>`).join(' ')}</span>`;
+        }
+        locEl.innerHTML = html;
+        card.appendChild(locEl);
+      }
+
+      // Expandable sub-check detail
+      if (richSubChecks.length > 0) {
+        const detailId = `detail-${check.rule_id}-${advisory ? 'adv' : 'scored'}`;
+        const toggleBtn = document.createElement('button');
+        toggleBtn.className = 'text-xs text-blue-400 hover:text-blue-300 mt-3 flex items-center gap-1 transition-colors';
+        toggleBtn.innerHTML = `<span class="detail-arrow">&#9654;</span> Show detailed sub-checks`;
+        toggleBtn.onclick = () => {
+          const el = document.getElementById(detailId);
+          const arrow = toggleBtn.querySelector('.detail-arrow');
+          if (el.classList.contains('hidden')) {
+            el.classList.remove('hidden');
+            arrow.innerHTML = '&#9660;';
+            toggleBtn.querySelector('span:last-child')?.remove();
+            toggleBtn.insertAdjacentHTML('beforeend', '<span> Hide detailed sub-checks</span>');
+          } else {
+            el.classList.add('hidden');
+            arrow.innerHTML = '&#9654;';
+            toggleBtn.querySelector('span:last-child')?.remove();
+            toggleBtn.insertAdjacentHTML('beforeend', '<span> Show detailed sub-checks</span>');
+          }
+        };
+        card.appendChild(toggleBtn);
+
+        const detailSection = document.createElement('div');
+        detailSection.id = detailId;
+        detailSection.className = 'hidden mt-3 space-y-3 border-t border-gray-700 pt-3';
+
+        for (const sc of richSubChecks) {
+          const scEl = document.createElement('div');
+          scEl.className = `rounded p-3 ${sc.passed ? 'bg-green-950/30 border border-green-900' : 'bg-red-950/20 border border-red-900/50'}`;
+          const statusIcon = sc.passed ? '&#10003;' : '&#10007;';
+          const statusColor = sc.passed ? 'text-green-400' : 'text-red-400';
+
+          let html = `
+            <div class="flex items-start gap-2">
+              <span class="${statusColor} font-bold text-sm mt-0.5">${statusIcon}</span>
+              <div class="flex-1">
+                <p class="text-sm font-medium text-gray-200">${sc.description}</p>
+                <p class="text-xs text-gray-400 mt-1">${sc.reasoning}</p>
+          `;
+
+          if (sc.article_reference) {
+            html += `<p class="text-xs text-blue-400 mt-1">${sc.article_reference}</p>`;
+          }
+
+          if (sc.locations && sc.locations.length > 0) {
+            const label = sc.passed ? 'Found in' : 'Expected';
+            const maxLoc = 5;
+            const shownLoc = sc.locations.slice(0, maxLoc);
+            const extraLoc = sc.locations.length > maxLoc ? ` <span class="text-gray-600">+${sc.locations.length - maxLoc} more</span>` : '';
+            html += `<p class="text-xs text-gray-500 mt-1">${label}: ${shownLoc.map(l => '<code class="bg-gray-800 px-1 rounded">' + l + '</code>').join(' ')}${extraLoc}</p>`;
+          }
+
+          html += '</div></div>';
+          scEl.innerHTML = html;
+          detailSection.appendChild(scEl);
+        }
+
+        card.appendChild(detailSection);
+      }
+
+      // Evidence summary (collapsed by default when sub-checks shown)
+      if (check.evidence?.description && richSubChecks.length === 0) {
         const ev = document.createElement('p');
         ev.className = 'text-sm text-gray-300 mt-3';
         ev.textContent = `Evidence: ${check.evidence.description}`;
@@ -472,6 +775,50 @@
       }
 
       return card;
+    }
+
+    // --- Jurisdictions ---
+    async function loadJurisdictions() {
+      try {
+        const res = await fetch(`${API_URL}/api/v1/taxonomy/jurisdictions`);
+        if (!res.ok) return;
+        const data = await res.json();
+        const grid = $('jurisdictions-grid');
+        grid.innerHTML = '';
+
+        const STATUS_STYLES_J = {
+          supported: { bg: 'bg-green-900/40 border-green-700', badge: 'bg-green-600 text-white', label: 'Supported' },
+          coming_soon: { bg: 'bg-yellow-900/30 border-yellow-700', badge: 'bg-yellow-600 text-gray-900', label: 'Coming Soon' },
+          research: { bg: 'bg-gray-800 border-gray-600', badge: 'bg-gray-600 text-white', label: 'Research' },
+        };
+
+        for (const j of data.jurisdictions) {
+          const s = STATUS_STYLES_J[j.coverage_status] || STATUS_STYLES_J.research;
+          const el = document.createElement('div');
+          el.className = `rounded-lg border p-3 ${s.bg}`;
+          const lawStatus = j.law_status === 'active' ? '<span class="text-xs text-green-400">Active</span>'
+            : j.law_status === 'enacted' ? '<span class="text-xs text-yellow-400">Enacted</span>'
+            : '<span class="text-xs text-gray-400">Proposed</span>';
+
+          el.innerHTML = `
+            <div class="flex items-center justify-between mb-1">
+              <span class="text-sm font-semibold text-gray-200">${j.short_name}</span>
+              <span class="text-xs font-medium px-2 py-0.5 rounded-full ${s.badge}">${s.label}</span>
+            </div>
+            <p class="text-xs text-gray-400">${j.jurisdiction}</p>
+            <div class="flex items-center gap-2 mt-1">
+              ${lawStatus}
+              ${j.enforcement_date ? `<span class="text-xs text-gray-500">Enforces: ${j.enforcement_date}</span>` : ''}
+            </div>
+            <div class="mt-2 w-full bg-gray-700 rounded-full h-1.5">
+              <div class="bg-blue-500 h-1.5 rounded-full" style="width: ${j.scanner_coverage_pct}%"></div>
+            </div>
+            <p class="text-xs text-gray-500 mt-0.5">${j.scanner_coverage_pct}% scanner coverage</p>
+          `;
+          grid.appendChild(el);
+        }
+        show('jurisdictions-section');
+      } catch { /* silent */ }
     }
 
     // --- PDF Download ---

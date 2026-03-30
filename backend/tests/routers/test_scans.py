@@ -72,11 +72,12 @@ class TestScanRepoEndpoint:
         assert data["repository"] == "https://github.com/org/repo"
         assert "assessment" in data
         assert "scanner_output" in data
-        # Risk-tiered: non-HIGH repos get 2 scored checks (Art. 5 + 50)
-        # Art. 9-15 appear in advisory_checks instead
+        # Risk-tiered: non-HIGH repos get 10 scored checks
+        # (Art. 5, 6, 50 universal + Art. 16, 17, 26, 27 organizational + Art. 53, 55 GPAI + Art. 72)
+        # Art. 8-15 appear in advisory_checks
         total_scored = data["assessment"]["summary"]["total_checks"]
         advisory = data["assessment"].get("advisory_checks") or []
-        assert total_scored + len(advisory) == 9  # 2 scored + 7 advisory
+        assert total_scored + len(advisory) == 18  # 10 scored + 8 advisory
 
     @respx.mock
     def test_repo_not_found_returns_404(self, api_client):
@@ -213,8 +214,8 @@ class TestExportEndpoint:
         assert response.status_code == 200
         data = response.json()
         assert data["platform"] == "vanta"
-        # Risk-tiered: non-HIGH repos get 2 scored controls (Art. 5 + 50)
-        assert len(data["controls"]) == 2
+        # Non-HIGH repos get 10 scored controls (universal + organizational + GPAI + lifecycle)
+        assert len(data["controls"]) == 10
 
     def test_unknown_platform_returns_400(self, api_client):
         response = api_client.post(

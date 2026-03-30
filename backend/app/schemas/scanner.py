@@ -168,6 +168,15 @@ class ScannerOutput(BaseModel):
     has_feedback_loop_prevention: bool = False
     has_error_resilience_docs: bool = False
 
+    # Articles 16, 17, 26, 27, 53, 55, 72 — organizational/GPAI signals
+    has_contact_info: bool = False
+    has_impact_assessment: bool = False
+    has_monitoring_config: bool = False
+    has_incident_reporting: bool = False
+    has_copyright_policy: bool = False
+    has_qms_docs: bool = False
+    has_conformity_assessment: bool = False
+
     # Article 5 — prohibited practice indicators (absence = PASS)
     has_social_scoring_indicators: bool = False
     has_biometric_identification: bool = False
@@ -192,6 +201,12 @@ class ScannerOutput(BaseModel):
 
     # Call-chain analysis findings (AI output → decision patterns)
     call_chain_findings: list[CallChainFinding] = Field(default_factory=list)
+
+    # Matched file paths per signal (populated by scanner, used by article checks)
+    matched_paths: dict[str, list[str]] = Field(default_factory=dict)
+
+    # External evidence from uploaded documents
+    external_evidence: list[dict] = Field(default_factory=list)
 
     # Risk classification (computed after all scan passes)
     risk_classification: RiskClassification | None = None
