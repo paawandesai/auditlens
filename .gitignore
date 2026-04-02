@@ -1,5 +1,7 @@
 
 CLAUDE.md
+.DS_Store
+.coverage
 sprint_plan.md
 tmp/
 .claude/rules/
