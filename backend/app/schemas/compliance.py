@@ -50,6 +50,7 @@ class ComplianceCheck(BaseModel):
     reasoning: str | None = None
     evidence_locations: list[str] = Field(default_factory=list)
     sub_checks: list[SubCheckDetail] = Field(default_factory=list)
+    evidence_source: str = "repo_scan"
 
 
 class ComplianceSummary(BaseModel):

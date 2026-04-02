@@ -410,6 +410,122 @@ def build_doc_validations_section(validations: list[DocValidation]) -> list[Flow
     return flowables
 
 
+def build_adversarial_summary_section(findings: list[dict]) -> list[Flowable]:
+    """Adversarial testing results — category breakdown and critical findings.
+
+    Returns empty list if no findings. Only appears when red team data is present.
+    """
+    if not findings:
+        return []
+
+    flowables: list[Flowable] = []
+    flowables.append(Paragraph("Adversarial Testing Results", HEADING_STYLE))
+
+    # Compute totals
+    total = len(findings)
+    passed = sum(1 for f in findings if f.get("grade") == "pass")
+    failed = sum(1 for f in findings if f.get("grade") in ("fail", "critical_fail"))
+    critical = sum(1 for f in findings if f.get("grade") == "critical_fail")
+
+    flowables.append(
+        Paragraph(
+            f"<b>{total}</b> tests &nbsp;|&nbsp; "
+            f"<font color='#2eb872'><b>{passed}</b> passed</font> &nbsp;|&nbsp; "
+            f"<font color='#d93636'><b>{failed}</b> failed</font> &nbsp;|&nbsp; "
+            f"<font color='#8b0000'><b>{critical}</b> critical</font>",
+            BODY_STYLE,
+        )
+    )
+    flowables.append(Spacer(1, 8))
+
+    # Category breakdown table
+    categories: dict[str, dict[str, int]] = {}
+    for f in findings:
+        cat = f.get("category", "unknown")
+        if cat not in categories:
+            categories[cat] = {"total": 0, "pass": 0, "fail": 0}
+        categories[cat]["total"] += 1
+        if f.get("grade") == "pass":
+            categories[cat]["pass"] += 1
+        elif f.get("grade") in ("fail", "critical_fail", "partial_fail"):
+            categories[cat]["fail"] += 1
+
+    cat_data = [["Category", "Tests", "Pass", "Fail", "Pass Rate"]]
+    cat_rates: list[float] = []
+    for cat_name, counts in sorted(categories.items()):
+        rate = counts["pass"] / counts["total"] if counts["total"] > 0 else 0.0
+        cat_rates.append(rate)
+        cat_data.append([
+            cat_name.replace("-", " ").replace("_", " ").title(),
+            str(counts["total"]),
+            str(counts["pass"]),
+            str(counts["fail"]),
+            f"{rate:.0%}",
+        ])
+
+    cat_table = Table(cat_data, colWidths=[2.0 * inch, 0.8 * inch, 0.8 * inch, 0.8 * inch, 1.0 * inch])
+    style_cmds = [
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4a3f8a")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dddddd")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+    ]
+    # Color-code pass rate cells
+    for row_idx, rate in enumerate(cat_rates, start=1):
+        if rate >= 0.8:
+            cell_color = colors.HexColor("#2eb872")
+        elif rate >= 0.5:
+            cell_color = colors.HexColor("#f2a60d")
+        else:
+            cell_color = colors.HexColor("#d93636")
+        style_cmds.append(("BACKGROUND", (4, row_idx), (4, row_idx), cell_color))
+        style_cmds.append(("TEXTCOLOR", (4, row_idx), (4, row_idx), colors.white))
+
+    cat_table.setStyle(TableStyle(style_cmds))
+    flowables.append(cat_table)
+    flowables.append(Spacer(1, 10))
+
+    # Critical findings detail (severity >= 4 AND grade in fail/critical_fail)
+    critical_findings = [
+        f for f in findings
+        if f.get("severity", 0) >= 4 and f.get("grade") in ("fail", "critical_fail")
+    ][:10]  # Cap at 10
+
+    if critical_findings:
+        flowables.append(Paragraph("Critical Findings Detail", SUBTITLE_STYLE))
+        flowables.append(Spacer(1, 4))
+
+        for cf in critical_findings:
+            severity_badge = f"SEV-{cf.get('severity', '?')}"
+            grade_text = cf.get("grade", "").replace("_", " ").upper()
+            category = cf.get("category", "unknown").replace("-", " ").replace("_", " ").title()
+            article = cf.get("mapped_article", "")
+            reasoning = cf.get("reasoning", "No details provided.")
+
+            flowables.append(
+                Paragraph(
+                    f"<b>{category}</b> &nbsp; "
+                    f"<font color='#d93636'>[{severity_badge}]</font> &nbsp; "
+                    f"<font color='#d93636'>{grade_text}</font>"
+                    f"{f' &nbsp; → {article}' if article else ''}",
+                    BODY_STYLE,
+                )
+            )
+            flowables.append(
+                Paragraph(reasoning[:300], REMEDIATION_STYLE)
+            )
+            flowables.append(Spacer(1, 4))
+
+    flowables.append(Spacer(1, 10))
+    return flowables
+
+
 def build_footer() -> list[Flowable]:
     """Methodology disclaimer and branding."""
     return [

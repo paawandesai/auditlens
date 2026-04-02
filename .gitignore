@@ -22,5 +22,10 @@ __pycache__/
 dist/
 build/
 
+# SQLite database
+data/*.db
+data/*.db-journal
+data/*.db-wal
+
 # Test fixtures (example compliance documents)
 test/

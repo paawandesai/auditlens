@@ -14,6 +14,7 @@ from reportlab.platypus import SimpleDocTemplate
 from app.schemas.compliance import AssessmentResult
 from app.schemas.scanner import ScannerOutput
 from app.services.pdf.sections import (
+    build_adversarial_summary_section,
     build_advisory_header,
     build_article_section,
     build_config_signals_section,
@@ -96,6 +97,26 @@ def generate_compliance_pdf(
     )
     for check in sorted_checks:
         flowables.extend(build_article_section(check))
+
+    # Adversarial testing section (only when red team data present)
+    adversarial_checks = [
+        c for c in assessment.checks if c.evidence_source == "adversarial_test"
+    ]
+    if adversarial_checks:
+        # Severity mapping: critical article checks → severity 4, high → 3
+        _sev_map = {"critical": 4, "high": 3, "medium": 2, "low": 1}
+        adversarial_findings = []
+        for check in adversarial_checks:
+            base_severity = _sev_map.get(check.severity, 2)
+            for sc in check.sub_checks:
+                adversarial_findings.append({
+                    "category": sc.description.split("/")[0],
+                    "grade": "pass" if sc.passed else "fail",
+                    "severity": base_severity,
+                    "reasoning": sc.reasoning,
+                    "mapped_article": check.article,
+                })
+        flowables.extend(build_adversarial_summary_section(adversarial_findings))
 
     # Advisory sections (Art. 9-15 for non-HIGH risk, informational only)
     if assessment.advisory_checks:

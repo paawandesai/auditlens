@@ -52,6 +52,7 @@ from app.services.grc.generic_adapter import GenericAdapter
 from app.services.grc.secureframe_adapter import SecureframeAdapter
 from app.services.grc.vanta_adapter import VantaAdapter
 from app.services.pdf.report_builder import generate_compliance_pdf
+from app.storage.sqlite_store import get_store
 
 router = APIRouter(prefix="/api/v1/scans", tags=["Scanning"])
 
@@ -206,6 +207,12 @@ async def scan_repo(request: Request, body: RepoScanRequest) -> dict:
         "assessment": assessment.model_dump(mode="json"),
     }
     _store_scan(assessment.assessment_id, result)
+    store = get_store()
+    if store:
+        try:
+            store.save_scan(assessment.assessment_id, body.repository_url, result)
+        except Exception:
+            pass  # SQLite failure must not break the request
     return result
 
 
@@ -354,6 +361,16 @@ async def scan_repo_complete(request: Request, body: CompleteScanRequest) -> dic
         "assessment": assessment.model_dump(mode="json"),
     }
     _store_scan(assessment.assessment_id, result)
+    store = get_store()
+    if store:
+        try:
+            store.save_scan(
+                assessment.assessment_id,
+                body.repository_url or "deployer://no-repo",
+                result,
+            )
+        except Exception:
+            pass  # SQLite failure must not break the request
     return result
 
 
@@ -364,11 +381,25 @@ async def list_export_platforms(request: Request) -> dict:
     return {"platforms": GRC_REGISTRY.available_platforms()}
 
 
+@router.get("")
+@limiter.limit(RATE_LIMIT_READ)
+async def list_recent_scans(request: Request, limit: int = 20) -> dict:
+    """Return metadata for recently stored scans (newest first)."""
+    store = get_store()
+    if not store:
+        return {"scans": []}
+    return {"scans": store.get_recent_scans(limit=min(limit, 100))}
+
+
 @router.get("/{scan_id}")
 @limiter.limit(RATE_LIMIT_READ)
 async def get_scan(request: Request, scan_id: str) -> dict:
-    """Retrieve a previously stored scan result by ID (24h TTL)."""
+    """Retrieve a previously stored scan result by ID."""
     result = _get_scan(scan_id)
+    if result is None:
+        store = get_store()
+        if store:
+            result = store.get_scan(scan_id)
     if result is None:
         raise HTTPException(status_code=404, detail="Scan not found or expired")
     return result
