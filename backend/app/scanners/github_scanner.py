@@ -288,6 +288,9 @@ class GitHubScanner:
                 url = f"{GITHUB_API}/repos/{owner}/{repo}/contents/{path}?ref={branch}"
                 try:
                     data = await self._api_get(url)
+                    # GitHub returns a list for directories, dict for files — skip directories
+                    if isinstance(data, list):
+                        return path, None
                     content = data.get("content", "")
                     encoding = data.get("encoding", "")
                     if encoding == "base64" and content:
