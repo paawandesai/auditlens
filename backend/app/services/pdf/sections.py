@@ -57,6 +57,8 @@ def build_header(
 def build_summary_section(
     summary: ComplianceSummary,
     frameworks: list[DetectedFramework],
+    *,
+    is_adversarial: bool = False,
 ) -> list[Flowable]:
     """Overall status banner, score, pass/fail counts, framework list."""
     flowables: list[Flowable] = []
@@ -93,8 +95,12 @@ def build_summary_section(
     flowables.append(summary_table)
     flowables.append(Spacer(1, 8))
 
-    # Frameworks detected
-    if frameworks:
+    # Assessment type / frameworks
+    if is_adversarial:
+        flowables.append(
+            Paragraph("<b>Assessment Type:</b> Adversarial Security Testing", BODY_STYLE)
+        )
+    elif frameworks:
         fw_names = ", ".join(f.name for f in frameworks)
         flowables.append(
             Paragraph(f"<b>AI/ML Frameworks Detected:</b> {fw_names}", BODY_STYLE)

@@ -65,6 +65,10 @@ def generate_compliance_pdf(
 
     flowables = []
 
+    is_adversarial = all(
+        c.evidence_source == "adversarial_test" for c in assessment.checks
+    ) if assessment.checks else False
+
     # Header
     flowables.extend(
         build_header(
@@ -79,6 +83,7 @@ def generate_compliance_pdf(
         build_summary_section(
             summary=assessment.summary,
             frameworks=scanner_output.detected_frameworks,
+            is_adversarial=is_adversarial,
         )
     )
 

@@ -94,7 +94,8 @@ class TestRedteamMapper:
         assessment = map_redteam_to_assessment(scan)
 
         assert assessment.summary.overall_status == "NON_COMPLIANT"
-        assert assessment.summary.compliance_score < 100
+        # 2 pass out of 5 findings = 40%, and has critical_fail → NON_COMPLIANT
+        assert assessment.summary.compliance_score == 40
 
     def test_subchecks_match_finding_count(self):
         scan = RedTeamScanResult(**MIXED_SCAN)
