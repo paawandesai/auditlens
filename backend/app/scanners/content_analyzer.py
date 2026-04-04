@@ -27,7 +27,8 @@ from app.schemas.scanner import DocValidation
 FILE_TREE_RULES: list[tuple[str, list[str]]] = [
     ("has_risk_assessment", [
         "*risk_assessment*", "*risk-assessment*", "*risk_management*", "*risk-management*",
-        "*RISK_ASSESSMENT*",
+        "*RISK_ASSESSMENT*", "*risk_analysis*", "*risk_register*", "compliance/*risk*",
+        "*RISK.md",
     ]),
     ("has_model_card", [
         "*model_card*", "*model-card*", "*MODEL_CARD*",
@@ -43,6 +44,7 @@ FILE_TREE_RULES: list[tuple[str, list[str]]] = [
     ]),
     ("has_data_documentation", [
         "*data_card*", "*data-card*", "*dataset_card*", "*dataset-card*", "*datasheet*",
+        "*data_provenance*", "*data_lineage*", "*data_manifest*",
     ]),
     ("has_failure_modes_doc", [
         "tests/risk*", "tests/safety*", "test/risk*", "test/safety*",
@@ -52,6 +54,32 @@ FILE_TREE_RULES: list[tuple[str, list[str]]] = [
     ]),
     ("has_model_card_user_instructions", [
         "*USAGE*", "*user_guide*", "*user-guide*", "*deployer_guide*", "*deployer-guide*",
+    ]),
+    # Articles 16, 17, 26, 27, 53, 55, 72 — organizational/GPAI signals
+    ("has_contact_info", [
+        "SECURITY.md", "SECURITY.rst", "CONTRIBUTING.md", "CONTRIBUTING.rst",
+        "MAINTAINERS", "MAINTAINERS.md", "CODEOWNERS", ".github/CODEOWNERS",
+        "SUPPORT.md",
+    ]),
+    ("has_impact_assessment", [
+        "*impact_assessment*", "*impact-assessment*", "*FRIA*",
+        "*fundamental_rights*", "*fundamental-rights*",
+        "*rights_assessment*", "*rights-assessment*",
+    ]),
+    ("has_monitoring_config", [
+        "*alerting*", "*monitoring*", "*grafana*", "*prometheus*",
+        "*datadog*", "*sentry*", "monitoring/*", "observability/*",
+    ]),
+    ("has_qms_docs", [
+        "*quality_management*", "*quality-management*", "*QMS*",
+        "*quality_policy*", "*quality-policy*",
+    ]),
+    ("has_conformity_assessment", [
+        "*conformity*", "*conformity_assessment*", "*conformity-assessment*",
+        "*ce_marking*", "*ce-marking*",
+    ]),
+    ("has_explainability", [
+        "*explainability*", "*interpretability*",
     ]),
 ]
 
@@ -198,12 +226,19 @@ CONTENT_RULES: list[tuple[str, list[KeywordRule]]] = [
     ]),
     ("has_feature_importance_docs", [
         KeywordRule("feature importance"),
+        KeywordRule("permutation importance"),
+        KeywordRule("shapley value"),
     ]),
     # Phase 2B: word-boundary for shap/lime, keep explainab as substring
     ("has_explainability", [
         KeywordRule("shap", word_boundary=True),
         KeywordRule("lime", word_boundary=True),
         KeywordRule("explainab"),
+        KeywordRule("captum"),
+        KeywordRule("eli5", word_boundary=True),
+        KeywordRule("alibi explain"),
+        KeywordRule("interpretml"),
+        KeywordRule("counterfactual explanation"),
     ]),
     # Phase 2B: compound phrases only — bare "logging" matches import logging
     ("has_logging_config", [
@@ -212,6 +247,8 @@ CONTENT_RULES: list[tuple[str, list[KeywordRule]]] = [
         KeywordRule("event logging"),
         KeywordRule("event record"),
         KeywordRule("decision log"),
+        KeywordRule("observability", require_doc_context=True),
+        KeywordRule("activity log"),
     ]),
     # Phase 2B: compound phrases only — bare "monitoring"/"drift" are too generic
     ("has_mitigation_plan", [
@@ -241,12 +278,19 @@ CONTENT_RULES: list[tuple[str, list[KeywordRule]]] = [
         KeywordRule("debiasing"),
         KeywordRule("fairness constraint"),
         KeywordRule("rebalancing"),
+        KeywordRule("adversarial debiasing"),
+        KeywordRule("equalized odds"),
+        KeywordRule("demographic parity"),
+        KeywordRule("disparity reduction"),
     ]),
     ("has_data_gaps_identified", [
         KeywordRule("data gap"),
         KeywordRule("underrepresented"),
         KeywordRule("missing data"),
         KeywordRule("data limitation"),
+        KeywordRule("class imbalance"),
+        KeywordRule("sampling bias"),
+        KeywordRule("representation gap"),
     ]),
     # Article 11
     ("has_development_process_docs", [
@@ -297,6 +341,8 @@ CONTENT_RULES: list[tuple[str, list[KeywordRule]]] = [
         KeywordRule("safe halt"),
         KeywordRule("kill switch"),
         KeywordRule("kill_switch"),
+        KeywordRule("circuit breaker"),
+        KeywordRule("failsafe"),
     ]),
     # Article 15
     ("has_cybersecurity_docs", [
@@ -317,6 +363,45 @@ CONTENT_RULES: list[tuple[str, list[KeywordRule]]] = [
         KeywordRule("fault tolerance"),
         KeywordRule("graceful degradation"),
         KeywordRule("fail-safe"),
+    ]),
+    # --- Articles 16, 17, 26, 27, 53, 55, 72 organizational/GPAI signals ---
+    ("has_incident_reporting", [
+        KeywordRule("incident report"),
+        KeywordRule("incident response"),
+        KeywordRule("incident management"),
+        KeywordRule("post-market surveillance"),
+        KeywordRule("serious incident"),
+    ]),
+    ("has_monitoring_config", [
+        KeywordRule("model monitoring"),
+        KeywordRule("production monitoring"),
+        KeywordRule("performance monitoring", require_doc_context=True),
+        KeywordRule("alerting"),
+        KeywordRule("drift monitoring"),
+    ]),
+    ("has_copyright_policy", [
+        KeywordRule("copyright policy"),
+        KeywordRule("data licensing"),
+        KeywordRule("intellectual property"),
+        KeywordRule("training data license"),
+        KeywordRule("content licensing"),
+    ]),
+    ("has_impact_assessment", [
+        KeywordRule("impact assessment"),
+        KeywordRule("fundamental rights"),
+        KeywordRule("rights impact"),
+        KeywordRule("algorithmic impact"),
+    ]),
+    ("has_qms_docs", [
+        KeywordRule("quality management"),
+        KeywordRule("quality assurance"),
+        KeywordRule("quality system"),
+    ]),
+    ("has_conformity_assessment", [
+        KeywordRule("conformity assessment"),
+        KeywordRule("ce marking"),
+        KeywordRule("self-assessment"),
+        KeywordRule("third-party audit"),
     ]),
     # --- Article 5 prohibited practice indicators ---
     ("has_social_scoring_indicators", [
@@ -387,30 +472,77 @@ ENV_AI_KEY_PATTERNS: list[str] = [
 ]
 
 
-def check_file_tree_flags(file_paths: list[str]) -> dict[str, bool]:
+def _collapse_directory_matches(matches: list[str], max_specific: int = 3) -> list[str]:
+    """Collapse large directory matches into summary entries.
+
+    If many files share a common directory prefix, replace them with
+    a single "directory/ (N files)" entry. Specific files (no common
+    directory or small count) are kept as-is.
+    """
+    if len(matches) <= max_specific:
+        return matches
+
+    # Group by top-level directory
+    from collections import Counter
+    dirs: Counter[str] = Counter()
+    specific: list[str] = []
+    for path in matches:
+        if "/" in path:
+            top_dir = path.split("/")[0]
+            dirs[top_dir] += 1
+        else:
+            specific.append(path)
+
+    result: list[str] = list(specific)
+    for dir_name, count in dirs.most_common():
+        if count > max_specific:
+            result.append(f"{dir_name}/ ({count} files)")
+        else:
+            # Keep individual files for small directories
+            result.extend(p for p in matches if p.startswith(dir_name + "/"))
+
+    return result[:max_specific + len(dirs)] if result else matches[:max_specific]
+
+
+def check_file_tree_flags(
+    file_paths: list[str],
+) -> tuple[dict[str, bool], dict[str, list[str]]]:
     """Match file paths against compliance patterns.
 
     Args:
         file_paths: list of repo-relative paths (e.g. "tests/test_model.py")
 
     Returns:
-        dict with ScannerOutput field names as keys, bool as values.
+        Tuple of (flags, matched_paths):
+        - flags: dict with ScannerOutput field names → bool
+        - matched_paths: dict with field names → list of actual file paths that matched
         Also includes internal flags: ``performance_metrics_present``,
         ``bias_analysis_found``, ``user_instructions_found``.
     """
-    lowered = [p.lower() for p in file_paths]
+    original_map = {p.lower(): p for p in file_paths}
+    lowered = list(original_map.keys())
 
     flags: dict[str, bool] = {}
+    matched_paths: dict[str, list[str]] = {}
 
     for field_name, patterns in FILE_TREE_RULES:
-        matched = any(
-            fnmatch(fp, pat.lower())
+        matches = [
+            original_map[fp]
             for fp in lowered
             for pat in patterns
-        )
-        # Some fields (e.g. has_logging_config) appear in both file-tree and content
-        # rules — use OR so either detection method can flip the flag.
-        flags[field_name] = flags.get(field_name, False) or matched
+            if fnmatch(fp, pat.lower())
+        ]
+        # Deduplicate while preserving order
+        seen: set[str] = set()
+        unique_matches = []
+        for m in matches:
+            if m not in seen:
+                seen.add(m)
+                unique_matches.append(m)
+        flags[field_name] = flags.get(field_name, False) or bool(unique_matches)
+        if unique_matches:
+            collapsed = _collapse_directory_matches(unique_matches)
+            matched_paths.setdefault(field_name, []).extend(collapsed)
 
     # Internal flags consumed by the scanner to build typed models
     flags["performance_metrics_present"] = any(
@@ -428,10 +560,12 @@ def check_file_tree_flags(file_paths: list[str]) -> dict[str, bool]:
         ]
     )
 
-    return flags
+    return flags, matched_paths
 
 
-def extract_content_flags(contents: dict[str, str]) -> dict[str, bool | dict[str, bool]]:
+def extract_content_flags(
+    contents: dict[str, str],
+) -> tuple[dict[str, bool | dict[str, bool]], dict[str, list[str]]]:
     """Keyword-match file contents for compliance signals.
 
     Phase 2 overhaul: uses KeywordRule with word boundaries and per-file
@@ -441,14 +575,31 @@ def extract_content_flags(contents: dict[str, str]) -> dict[str, bool | dict[str
         contents: dict mapping filename → file content text.
 
     Returns:
-        dict with ScannerOutput field names as keys.
-        Also includes ``training_data_sub`` dict with sub-field bools.
+        Tuple of (flags, matched_paths):
+        - flags: dict with ScannerOutput field names as keys.
+          Also includes ``training_data_sub`` dict with sub-field bools.
+        - matched_paths: dict with field names → list of filenames that matched
     """
     flags: dict[str, bool | dict[str, bool]] = {}
+    matched_paths: dict[str, list[str]] = {}
 
     for field_name, rules in CONTENT_RULES:
-        matched = any(_matches_keyword_per_file(rule, contents) for rule in rules)
-        flags[field_name] = bool(flags.get(field_name, False)) or matched
+        matching_files = []
+        for rule in rules:
+            for filename, content in contents.items():
+                lower_content = content.lower()
+                if rule.require_doc_context and _is_source_code_file(filename):
+                    continue
+                if _matches_keyword_in_text(rule, lower_content):
+                    if filename not in matching_files:
+                        matching_files.append(filename)
+        if matching_files:
+            flags[field_name] = True
+            new_files = [f for f in matching_files if f not in matched_paths.get(field_name, [])]
+            collapsed = _collapse_directory_matches(new_files)
+            matched_paths.setdefault(field_name, []).extend(collapsed)
+        else:
+            flags[field_name] = bool(flags.get(field_name, False))
 
     # Training data sub-field signals (simple substring — low FP risk)
     combined = "\n".join(contents.values()).lower()
@@ -473,7 +624,7 @@ def extract_content_flags(contents: dict[str, str]) -> dict[str, bool | dict[str
         key in upper_combined for key in ENV_AI_KEY_PATTERNS
     )
 
-    return flags
+    return flags, matched_paths
 
 
 # ---------------------------------------------------------------------------

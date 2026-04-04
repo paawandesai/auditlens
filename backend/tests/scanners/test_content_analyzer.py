@@ -2,7 +2,22 @@
 
 from __future__ import annotations
 
-from app.scanners.content_analyzer import check_file_tree_flags, extract_content_flags
+from app.scanners.content_analyzer import (
+    check_file_tree_flags as _check_file_tree_flags_raw,
+    extract_content_flags as _extract_content_flags_raw,
+)
+
+
+def check_file_tree_flags(file_paths):
+    """Wrapper returning only flags dict (backward compat for tests)."""
+    flags, _paths = _check_file_tree_flags_raw(file_paths)
+    return flags
+
+
+def extract_content_flags(contents):
+    """Wrapper returning only flags dict (backward compat for tests)."""
+    flags, _paths = _extract_content_flags_raw(contents)
+    return flags
 
 
 class TestCheckFileTreeFlags:

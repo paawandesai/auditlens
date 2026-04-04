@@ -1,5 +1,7 @@
 
 CLAUDE.md
+.DS_Store
+.coverage
 sprint_plan.md
 tmp/
 .claude/rules/
@@ -19,3 +21,11 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# SQLite database
+data/*.db
+data/*.db-journal
+data/*.db-wal
+
+# Test fixtures (example compliance documents)
+test/

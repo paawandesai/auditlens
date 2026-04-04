@@ -5,6 +5,12 @@ from Regulation (EU) 2024/1689. Used by article checks to ground evidence
 text in the actual regulatory text.
 """
 
+ART_6: dict[str, str] = {
+    "annex_iii": "[Art. 6(2)] AI system referred to in Annex III high-risk use cases",
+    "safety_component": "[Art. 6(1)] AI system as safety component of product under Annex I legislation",
+    "risk_determined": "[Art. 6(3)] Exception where AI does not pose significant risk to health, safety, or fundamental rights",
+}
+
 ART_9: dict[str, str] = {
     "risk_assessment": "[Art. 9(2)(a)] Identification and analysis of known and foreseeable risks",
     "failure_modes": "[Art. 9(2)(b)] Risk estimation under conditions of foreseeable misuse",
@@ -73,6 +79,62 @@ ART_5: dict[str, str] = {
         "[Art. 5(1)(f)] Emotion recognition in workplace or"
         " educational institutions"
     ),
+}
+
+ART_8: dict[str, str] = {
+    "compliance": "[Art. 8(1)] High-risk AI systems shall comply with the requirements of this Section",
+    "intended_purpose": "[Art. 8(1)] Taking into account their intended purpose and the generally acknowledged state of the art",
+}
+
+ART_16: dict[str, str] = {
+    "system_compliance": "[Art. 16(a)] Ensure AI system complies with Art. 8-15 requirements",
+    "contact_person": "[Art. 16(j)] Provide name, contact address upon request of competent authority",
+    "qms": "[Art. 16(c)] Quality management system per Art. 17",
+    "conformity": "[Art. 16(f)] Conformity assessment procedure per Art. 43",
+    "post_market": "[Art. 16(h)] Post-market monitoring system per Art. 72",
+}
+
+ART_17: dict[str, str] = {
+    "compliance_strategy": "[Art. 17(1)(a)] Strategy for regulatory compliance",
+    "design_procedures": "[Art. 17(1)(b)] Techniques, procedures and actions for design and development",
+    "testing_procedures": "[Art. 17(1)(c)] Techniques, procedures and actions for testing and validation",
+    "risk_procedures": "[Art. 17(1)(e)] Procedures for risk management",
+    "incident_reporting": "[Art. 17(1)(g)] Procedures for reporting serious incidents per Art. 73",
+}
+
+ART_26: dict[str, str] = {
+    "use_per_instructions": "[Art. 26(1)] Use AI system in accordance with instructions for use",
+    "human_oversight": "[Art. 26(2)] Assign human oversight to competent natural persons",
+    "monitoring": "[Art. 26(5)] Monitor operation and report to provider/distributor",
+    "inform_affected": "[Art. 26(7)] Inform affected natural persons of AI system use",
+    "workplace_notification": "[Art. 26(7)] Inform workers' representatives about AI use",
+}
+
+ART_27: dict[str, str] = {
+    "deployer_processes": "[Art. 27(1)(a)] Description of deployer's processes using AI system",
+    "duration_frequency": "[Art. 27(1)(b)] Duration and frequency of AI system use",
+    "affected_categories": "[Art. 27(1)(c)] Categories of natural persons and groups likely affected",
+    "specific_risks": "[Art. 27(1)(d)] Specific risks of harm likely to impact identified categories",
+    "oversight_complaint": "[Art. 27(1)(f)] Human oversight measures and complaint mechanisms",
+}
+
+ART_53: dict[str, str] = {
+    "technical_docs": "[Art. 53(1)(a)] Technical documentation maintained and updated",
+    "downstream_info": "[Art. 53(1)(b)] Information and documentation to downstream AI system providers",
+    "copyright": "[Art. 53(1)(c)] Policy to comply with copyright law",
+    "training_summary": "[Art. 53(1)(d)] Detailed summary of training content published",
+}
+
+ART_55: dict[str, str] = {
+    "model_evaluation": "[Art. 55(1)(a)] Model evaluation including adversarial testing",
+    "systemic_risk": "[Art. 55(1)(b)] Assess and mitigate systemic risks",
+    "incident_tracking": "[Art. 55(1)(c)] Track, document, and report serious incidents",
+    "cybersecurity": "[Art. 55(1)(d)] Ensure adequate level of cybersecurity protection",
+}
+
+ART_72: dict[str, str] = {
+    "monitoring_system": "[Art. 72(1)] Post-market monitoring system proportionate to nature and risks",
+    "monitoring_plan": "[Art. 72(2)] Post-market monitoring plan documented and updated",
 }
 
 ART_50: dict[str, str] = {

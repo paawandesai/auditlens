@@ -13,7 +13,7 @@ Sub-checks:
 
 from __future__ import annotations
 
-from app.schemas.compliance import CheckEvidence, ComplianceCheck, SeverityLiteral
+from app.schemas.compliance import CheckEvidence, ComplianceCheck, SeverityLiteral, SubCheckDetail
 from app.schemas.scanner import ScannerOutput
 from app.services.compliance.citations import ART_14
 
@@ -25,6 +25,43 @@ class Article14Check:
     rule_name: str = "Human Oversight"
     article: str = "Article 14"
     severity: SeverityLiteral = "critical"
+
+    _SUB_CHECK_META: dict[str, tuple[str, list[str], str]] = {
+        "human_in_loop_documented": (
+            "Human-in-the-loop mechanism documented",
+            ["docs/oversight/*", "docs/human_review/*"],
+            ART_14["human_in_loop"],
+        ),
+        "override_capability": (
+            "Human override capability for AI decisions",
+            ["docs/override/*", "docs/human_oversight/*"],
+            ART_14["override"],
+        ),
+        "escalation_procedures": (
+            "Escalation procedures for human intervention documented",
+            ["docs/escalation/*", "docs/human_oversight/*"],
+            ART_14["escalation"],
+        ),
+        "automation_bias_awareness": (
+            "Awareness of automation bias tendency documented",
+            ["docs/oversight/*", "docs/human_review/*"],
+            ART_14["automation_bias"],
+        ),
+        "stop_mechanism": (
+            "Stop button or similar procedure for safe halt",
+            ["docs/safety/*", "docs/override/*"],
+            ART_14["stop_mechanism"],
+        ),
+    }
+
+    # Map sub-check IDs to scanner field names for matched_paths lookup.
+    _SCANNER_FIELD_MAP: dict[str, str] = {
+        "human_in_loop_documented": "has_human_oversight_docs",
+        "override_capability": "has_override_mechanism",
+        "escalation_procedures": "has_escalation_docs",
+        "automation_bias_awareness": "has_automation_bias_docs",
+        "stop_mechanism": "has_stop_mechanism",
+    }
 
     def evaluate(self, scanner_output: ScannerOutput) -> ComplianceCheck:
         human_docs = scanner_output.has_human_oversight_docs
@@ -47,6 +84,42 @@ class Article14Check:
 
         remediation = self._build_remediation(sub_checks) if status != "PASS" else None
 
+        rich_sub_checks: list[SubCheckDetail] = []
+        for check_id, value in sub_checks.items():
+            description, default_locations, article_ref = self._SUB_CHECK_META[check_id]
+            scanner_field = self._SCANNER_FIELD_MAP[check_id]
+            actual_paths = scanner_output.matched_paths.get(scanner_field, [])
+            reasoning = (
+                f"Found: {', '.join(actual_paths)}"
+                if value and actual_paths
+                else f"Evidence detected via content analysis — {description.lower()}"
+                if value
+                else f"No evidence for {check_id.replace('_', ' ')} found. Expected files: {', '.join(default_locations)}."
+            )
+            rich_sub_checks.append(SubCheckDetail(
+                id=check_id,
+                description=description,
+                passed=value,
+                reasoning=reasoning,
+                locations=actual_paths if value and actual_paths else default_locations,
+                article_reference=article_ref,
+            ))
+
+        evidence_locations = [
+            path
+            for sc in rich_sub_checks
+            if sc.passed
+            for path in sc.locations
+        ]
+
+        overall_reasoning = (
+            "Article 14 requires high-risk AI systems to be designed for effective"
+            " human oversight during use. This repository shows"
+            f" {passed} of {total} human oversight signals, indicating "
+            + ("full" if passed == total else "partial" if passed > 0 else "no")
+            + " human oversight documentation."
+        )
+
         return ComplianceCheck(
             rule_id=self.rule_id,
             rule_name=self.rule_name,
@@ -59,6 +132,9 @@ class Article14Check:
             ),
             details=sub_checks,
             remediation=remediation,
+            reasoning=overall_reasoning,
+            evidence_locations=evidence_locations,
+            sub_checks=rich_sub_checks,
         )
 
     _FAILURE_DESCRIPTIONS: dict[str, str] = {

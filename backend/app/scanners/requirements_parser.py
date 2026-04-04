@@ -148,6 +148,42 @@ JS_FRAMEWORK_SIGNATURES: dict[str, dict] = {
     "@mediapipe/face_mesh": {"hr_relevance": 0.9, "confidence": 0.95},
 }
 
+# Java AI/ML framework signatures — matched against Maven/Gradle artifact IDs
+JAVA_FRAMEWORK_SIGNATURES: dict[str, dict] = {
+    "deeplearning4j": {"hr_relevance": 0.7, "confidence": 0.85},
+    "dl4j": {"hr_relevance": 0.7, "confidence": 0.85},
+    "nd4j": {"hr_relevance": 0.5, "confidence": 0.80},
+    "tensorflow": {"hr_relevance": 0.5, "confidence": 0.85},
+    "tensorflow-core": {"hr_relevance": 0.5, "confidence": 0.85},
+    "weka": {"hr_relevance": 0.6, "confidence": 0.80},
+    "smile": {"hr_relevance": 0.5, "confidence": 0.80},
+    "h2o": {"hr_relevance": 0.6, "confidence": 0.85},
+    "tribuo": {"hr_relevance": 0.5, "confidence": 0.80},
+    "djl": {"hr_relevance": 0.5, "confidence": 0.85},
+    "djl-api": {"hr_relevance": 0.5, "confidence": 0.85},
+    "onnxruntime": {"hr_relevance": 0.4, "confidence": 0.85},
+    "opennlp": {"hr_relevance": 0.6, "confidence": 0.80},
+    "stanford-corenlp": {"hr_relevance": 0.6, "confidence": 0.80},
+    "mallet": {"hr_relevance": 0.5, "confidence": 0.75},
+    "langchain4j": {"hr_relevance": 0.5, "confidence": 0.85},
+    "openai-java": {"hr_relevance": 0.5, "confidence": 0.85},
+    "azure-ai-openai": {"hr_relevance": 0.5, "confidence": 0.85},
+}
+
+# Go AI/ML framework signatures — matched against go.mod module paths
+GO_FRAMEWORK_SIGNATURES: dict[str, dict] = {
+    "gorgonia.org/gorgonia": {"hr_relevance": 0.6, "confidence": 0.85},
+    "gorgonia.org/tensor": {"hr_relevance": 0.4, "confidence": 0.80},
+    "golearn": {"hr_relevance": 0.5, "confidence": 0.80},
+    "goml": {"hr_relevance": 0.5, "confidence": 0.80},
+    "gocv.io/x/gocv": {"hr_relevance": 0.3, "confidence": 0.80},
+    "go-openai": {"hr_relevance": 0.5, "confidence": 0.85},
+    "go-anthropic": {"hr_relevance": 0.5, "confidence": 0.85},
+    "langchaingo": {"hr_relevance": 0.5, "confidence": 0.85},
+    "onnxruntime-go": {"hr_relevance": 0.4, "confidence": 0.80},
+    "github.com/nlpodyssey/spago": {"hr_relevance": 0.6, "confidence": 0.80},
+}
+
 
 class RequirementsParser:
     """Parses dependency manifests to detect ML/AI frameworks.
@@ -173,6 +209,9 @@ class RequirementsParser:
             "setup.cfg": self._parse_setup_cfg,
             "setup.py": self._parse_setup_py,
             "environment.yml": self._parse_environment_yml,
+            "pom.xml": self._parse_pom_xml,
+            "build.gradle": self._parse_build_gradle,
+            "go.mod": self._parse_go_mod,
         }
 
         for filename, content in files.items():
@@ -408,5 +447,82 @@ class RequirementsParser:
                         confidence=sig["confidence"],
                         hr_relevance_score=sig["hr_relevance"],
                     ))
+
+        return detected
+
+    def _parse_pom_xml(self, content: str) -> list[DetectedFramework]:
+        """Extract dependencies from Maven pom.xml.
+
+        Matches <artifactId>...</artifactId> elements against Java AI signatures.
+        """
+        detected: list[DetectedFramework] = []
+        artifact_ids = re.findall(r"<artifactId>\s*([^<]+?)\s*</artifactId>", content)
+
+        for artifact in artifact_ids:
+            artifact_lower = artifact.lower().strip()
+            for sig_name, sig in JAVA_FRAMEWORK_SIGNATURES.items():
+                if sig_name in artifact_lower:
+                    detected.append(DetectedFramework(
+                        name=artifact.strip(),
+                        version=None,
+                        confidence=sig["confidence"],
+                        hr_relevance_score=sig["hr_relevance"],
+                    ))
+                    break
+
+        return detected
+
+    def _parse_build_gradle(self, content: str) -> list[DetectedFramework]:
+        """Extract dependencies from Gradle build files.
+
+        Matches implementation/compile/api dependency declarations.
+        """
+        detected: list[DetectedFramework] = []
+        dep_patterns = re.findall(
+            r"(?:implementation|compile|api|runtimeOnly)\s*[('\"]([^'\"()]+)['\")]",
+            content,
+        )
+
+        for dep in dep_patterns:
+            dep_lower = dep.lower()
+            for sig_name, sig in JAVA_FRAMEWORK_SIGNATURES.items():
+                if sig_name in dep_lower:
+                    parts = dep.split(":")
+                    name = parts[1] if len(parts) >= 2 else dep
+                    version = parts[2] if len(parts) >= 3 else None
+                    detected.append(DetectedFramework(
+                        name=name.strip(),
+                        version=version,
+                        confidence=sig["confidence"],
+                        hr_relevance_score=sig["hr_relevance"],
+                    ))
+                    break
+
+        return detected
+
+    def _parse_go_mod(self, content: str) -> list[DetectedFramework]:
+        """Extract dependencies from Go module files.
+
+        Matches require directives against Go AI signatures.
+        """
+        detected: list[DetectedFramework] = []
+        require_lines = re.findall(
+            r"^\s*(?:require\s+)?([a-zA-Z0-9._/-]+)\s+v([0-9.]+)",
+            content,
+            re.MULTILINE,
+        )
+
+        for module_path, version in require_lines:
+            module_lower = module_path.lower()
+            for sig_name, sig in GO_FRAMEWORK_SIGNATURES.items():
+                if sig_name in module_lower:
+                    name = module_path.rsplit("/", 1)[-1]
+                    detected.append(DetectedFramework(
+                        name=name,
+                        version=version,
+                        confidence=sig["confidence"],
+                        hr_relevance_score=sig["hr_relevance"],
+                    ))
+                    break
 
         return detected

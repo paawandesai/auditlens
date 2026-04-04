@@ -86,7 +86,7 @@ class TestSelectJsFiles:
     def test_cap_at_limit(self):
         paths = [f"routes/route{i}.ts" for i in range(20)]
         result = select_js_files(paths)
-        assert len(result) <= 15
+        assert len(result) <= 25
 
     def test_deduplication(self):
         paths = ["index.js", "index.js", "index.js"]

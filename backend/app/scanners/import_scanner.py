@@ -48,7 +48,7 @@ IMPORT_SCAN_GLOBS: list[str] = [
 ]
 
 # Expanded limit for AST scanning (was 5 for regex)
-MAX_IMPORT_FILES = 15
+MAX_IMPORT_FILES = 30
 
 
 def scan_python_imports_ast(

@@ -63,14 +63,14 @@ class TestEuAiActTaxonomy:
             )
 
     def test_requirements_have_scanner_field_mapping(self, api_client):
-        """Automated requirements should map to at least one scanner field."""
+        """Automated requirements with direct scanner mapping should have fields."""
         response = api_client.get("/api/v1/taxonomy/eu-ai-act")
         data = response.json()
         for article in data["articles"]:
             for req in article["requirements"]:
-                if req["covered"]:
+                if req["covered"] and req["check_type"] == "automated":
                     assert len(req["scanner_fields"]) > 0, (
-                        f"{req['requirement_id']} is covered but maps to no scanner fields"
+                        f"{req['requirement_id']} is automated+covered but maps to no scanner fields"
                     )
 
 

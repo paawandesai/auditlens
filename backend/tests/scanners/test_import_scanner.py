@@ -158,7 +158,7 @@ class TestSelectPythonFiles:
             "extra1.py", "extra2.py",
         ]
         result = select_python_files(paths)
-        assert len(result) <= 15
+        assert len(result) <= 30
 
     def test_non_python_files_excluded(self):
         paths = ["model.js", "train.ts", "pipeline.go"]

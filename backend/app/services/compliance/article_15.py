@@ -14,7 +14,7 @@ Sub-checks:
 
 from __future__ import annotations
 
-from app.schemas.compliance import CheckEvidence, ComplianceCheck, SeverityLiteral
+from app.schemas.compliance import CheckEvidence, ComplianceCheck, SeverityLiteral, SubCheckDetail
 from app.schemas.scanner import PerformanceMetrics, ScannerOutput
 from app.services.compliance.citations import ART_15
 
@@ -26,6 +26,49 @@ class Article15Check:
     rule_name: str = "Accuracy, Robustness, Cybersecurity"
     article: str = "Article 15"
     severity: SeverityLiteral = "high"
+
+    _SUB_CHECK_META: dict[str, tuple[str, list[str], str]] = {
+        "test_metrics_logged": (
+            "Test set performance metrics logged",
+            ["eval_results/*", "metrics/*", "benchmark/*"],
+            ART_15["test_metrics"],
+        ),
+        "adversarial_tested": (
+            "Adversarial robustness testing conducted",
+            ["tests/*", "test/*"],
+            ART_15["adversarial"],
+        ),
+        "versioning_in_place": (
+            "Model versioning for rollback and change tracking",
+            [".github/workflows/*", ".dvc/*"],
+            ART_15["versioning"],
+        ),
+        "cybersecurity_measures": (
+            "Cybersecurity measures against attacks documented",
+            ["docs/security/*", "SECURITY.md"],
+            ART_15["cybersecurity"],
+        ),
+        "feedback_loop_prevention": (
+            "Measures to eliminate/reduce biased feedback loops",
+            ["docs/monitoring/*", "docs/fairness/*"],
+            ART_15["feedback_loop"],
+        ),
+        "error_resilience": (
+            "Error resilience and fault tolerance documented",
+            ["docs/reliability/*", "docs/safety/*"],
+            ART_15["error_resilience"],
+        ),
+    }
+
+    # Map sub-check IDs to scanner field names for matched_paths lookup.
+    _SCANNER_FIELD_MAP: dict[str, str] = {
+        "test_metrics_logged": "has_performance_metrics",
+        "adversarial_tested": "has_adversarial_testing",
+        "versioning_in_place": "has_versioning",
+        "cybersecurity_measures": "has_cybersecurity_docs",
+        "feedback_loop_prevention": "has_feedback_loop_prevention",
+        "error_resilience": "has_error_resilience_docs",
+    }
 
     def evaluate(self, scanner_output: ScannerOutput) -> ComplianceCheck:
         metrics = scanner_output.performance_metrics or PerformanceMetrics()
@@ -52,6 +95,42 @@ class Article15Check:
 
         remediation = self._build_remediation(sub_checks) if status != "PASS" else None
 
+        rich_sub_checks: list[SubCheckDetail] = []
+        for check_id, value in sub_checks.items():
+            description, default_locations, article_ref = self._SUB_CHECK_META[check_id]
+            scanner_field = self._SCANNER_FIELD_MAP[check_id]
+            actual_paths = scanner_output.matched_paths.get(scanner_field, [])
+            reasoning = (
+                f"Found: {', '.join(actual_paths)}"
+                if value and actual_paths
+                else f"Evidence detected via content analysis — {description.lower()}"
+                if value
+                else f"No evidence for {check_id.replace('_', ' ')} found. Expected files: {', '.join(default_locations)}."
+            )
+            rich_sub_checks.append(SubCheckDetail(
+                id=check_id,
+                description=description,
+                passed=value,
+                reasoning=reasoning,
+                locations=actual_paths if value and actual_paths else default_locations,
+                article_reference=article_ref,
+            ))
+
+        evidence_locations = [
+            path
+            for sc in rich_sub_checks
+            if sc.passed
+            for path in sc.locations
+        ]
+
+        overall_reasoning = (
+            "Article 15 requires high-risk AI systems to achieve appropriate levels"
+            " of accuracy, robustness, and cybersecurity. This repository shows"
+            f" {passed} of {total} accuracy/robustness signals, indicating "
+            + ("full" if passed == total else "partial" if passed > 0 else "no")
+            + " accuracy, robustness, and cybersecurity documentation."
+        )
+
         return ComplianceCheck(
             rule_id=self.rule_id,
             rule_name=self.rule_name,
@@ -64,6 +143,9 @@ class Article15Check:
             ),
             details=sub_checks,
             remediation=remediation,
+            reasoning=overall_reasoning,
+            evidence_locations=evidence_locations,
+            sub_checks=rich_sub_checks,
         )
 
     def _check_test_metrics(self, metrics: PerformanceMetrics) -> bool:

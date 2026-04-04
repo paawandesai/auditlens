@@ -38,7 +38,7 @@ JS_IMPORT_SCAN_GLOBS: list[str] = [
     "model", "agent", "llm", "chat",
 ]
 
-MAX_JS_IMPORT_FILES = 15
+MAX_JS_IMPORT_FILES = 25
 
 
 def _try_tree_sitter() -> bool:

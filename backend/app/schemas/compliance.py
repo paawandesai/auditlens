@@ -25,6 +25,17 @@ class CheckEvidence(BaseModel):
     checked_at: datetime = Field(default_factory=lambda: datetime.now(UTC))
 
 
+class SubCheckDetail(BaseModel):
+    """Rich detail for a single sub-check within an article assessment."""
+
+    id: str
+    description: str
+    passed: bool
+    reasoning: str
+    locations: list[str] = Field(default_factory=list)
+    article_reference: str = ""
+
+
 class ComplianceCheck(BaseModel):
     """Result of a single article compliance check."""
 
@@ -36,6 +47,10 @@ class ComplianceCheck(BaseModel):
     evidence: CheckEvidence
     details: dict[str, bool | str | int | float | dict | None]
     remediation: str | None = None
+    reasoning: str | None = None
+    evidence_locations: list[str] = Field(default_factory=list)
+    sub_checks: list[SubCheckDetail] = Field(default_factory=list)
+    evidence_source: str = "repo_scan"
 
 
 class ComplianceSummary(BaseModel):

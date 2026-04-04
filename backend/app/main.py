@@ -4,17 +4,29 @@ from __future__ import annotations
 
 import json
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from app.routers.evidence import router as evidence_router
+from app.routers.redteam import router as redteam_router
 from app.routers.scans import router as scans_router
 from app.routers.taxonomy import router as taxonomy_router
 from app.security.rate_limit import limiter
+from app.storage.sqlite_store import init_store
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_store()
+    yield
+
 
 app = FastAPI(
+    lifespan=lifespan,
     title="AuditLens AI",
     version="0.3.0",
     description=(
@@ -100,7 +112,9 @@ app.add_middleware(
 )
 
 app.include_router(scans_router)
+app.include_router(evidence_router)
 app.include_router(taxonomy_router)
+app.include_router(redteam_router)
 
 
 @app.get("/health")
