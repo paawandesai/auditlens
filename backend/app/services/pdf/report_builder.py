@@ -15,6 +15,7 @@ from app.schemas.compliance import AssessmentResult
 from app.schemas.scanner import ScannerOutput
 from app.services.pdf.sections import (
     build_adversarial_summary_section,
+    build_regulatory_exposure_section,
     build_advisory_header,
     build_article_section,
     build_config_signals_section,
@@ -65,6 +66,10 @@ def generate_compliance_pdf(
 
     flowables = []
 
+    is_adversarial = all(
+        c.evidence_source == "adversarial_test" for c in assessment.checks
+    ) if assessment.checks else False
+
     # Header
     flowables.extend(
         build_header(
@@ -79,6 +84,7 @@ def generate_compliance_pdf(
         build_summary_section(
             summary=assessment.summary,
             frameworks=scanner_output.detected_frameworks,
+            is_adversarial=is_adversarial,
         )
     )
 
@@ -129,6 +135,9 @@ def generate_compliance_pdf(
         )
         for check in sorted_advisory:
             flowables.extend(build_article_section(check, advisory=True))
+
+    # Regulatory exposure (only if any checks failed)
+    flowables.extend(build_regulatory_exposure_section(assessment.checks))
 
     # Footer
     flowables.extend(build_footer())

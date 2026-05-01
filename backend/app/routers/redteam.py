@@ -48,8 +48,8 @@ async def ingest_redteam_pdf(request: Request, body: RedTeamScanResult) -> Strea
     """Ingest red team findings and return an audit-ready PDF report."""
     assessment = map_redteam_to_assessment(body)
 
-    target_name = body.target.get("name", body.scan_id)
-    scanner_output = ScannerOutput(repo_url=f"Target: {target_name}")
+    target_name = body.target.get("name", "Unknown Agent")
+    scanner_output = ScannerOutput(repo_url=target_name)
 
     pdf_bytes = generate_compliance_pdf(assessment, scanner_output)
 

@@ -57,6 +57,8 @@ def build_header(
 def build_summary_section(
     summary: ComplianceSummary,
     frameworks: list[DetectedFramework],
+    *,
+    is_adversarial: bool = False,
 ) -> list[Flowable]:
     """Overall status banner, score, pass/fail counts, framework list."""
     flowables: list[Flowable] = []
@@ -93,8 +95,12 @@ def build_summary_section(
     flowables.append(summary_table)
     flowables.append(Spacer(1, 8))
 
-    # Frameworks detected
-    if frameworks:
+    # Assessment type / frameworks
+    if is_adversarial:
+        flowables.append(
+            Paragraph("<b>Assessment Type:</b> Adversarial Security Testing", BODY_STYLE)
+        )
+    elif frameworks:
         fw_names = ", ".join(f.name for f in frameworks)
         flowables.append(
             Paragraph(f"<b>AI/ML Frameworks Detected:</b> {fw_names}", BODY_STYLE)
@@ -522,6 +528,80 @@ def build_adversarial_summary_section(findings: list[dict]) -> list[Flowable]:
             )
             flowables.append(Spacer(1, 4))
 
+    flowables.append(Spacer(1, 10))
+    return flowables
+
+
+def build_regulatory_exposure_section(
+    checks: list[ComplianceCheck],
+) -> list[Flowable]:
+    """Regulatory exposure based on failed articles and EU AI Act Article 99 penalties.
+
+    Only appears when at least one check has FAIL status.
+    """
+    failed_checks = [c for c in checks if c.status == "FAIL"]
+    if not failed_checks:
+        return []
+
+    flowables: list[Flowable] = []
+    flowables.append(Paragraph("Regulatory Exposure", HEADING_STYLE))
+
+    # Determine which penalty tiers apply
+    failed_articles = {c.article for c in failed_checks}
+
+    tier1_arts = failed_articles & {"Article 5"}
+    tier2_arts = failed_articles & {
+        "Article 8", "Article 9", "Article 10", "Article 11",
+        "Article 12", "Article 13", "Article 14", "Article 15",
+    }
+    tier3_arts = failed_articles & {"Article 50"}
+
+    tier_data = [["Penalty Tier", "Failed Articles", "Maximum Exposure"]]
+    if tier1_arts:
+        tier_data.append([
+            "Prohibited Practices",
+            ", ".join(sorted(tier1_arts)),
+            "Up to \u20ac35M or 7% of global annual turnover, whichever is higher",
+        ])
+    if tier2_arts:
+        tier_data.append([
+            "High-Risk Obligations",
+            ", ".join(sorted(tier2_arts)),
+            "Up to \u20ac15M or 3% of global annual turnover, whichever is higher",
+        ])
+    if tier3_arts:
+        tier_data.append([
+            "Transparency Obligations",
+            ", ".join(sorted(tier3_arts)),
+            "Up to \u20ac7.5M or 1% of global annual turnover, whichever is higher",
+        ])
+
+    if len(tier_data) > 1:
+        tier_table = Table(tier_data, colWidths=[1.5 * inch, 1.8 * inch, 2.5 * inch])
+        tier_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4a3f8a")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dddddd")),
+            ("TOPPADDING", (0, 0), (-1, -1), 5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 6),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]))
+        flowables.append(tier_table)
+
+    flowables.append(Spacer(1, 8))
+    flowables.append(
+        Paragraph(
+            "<i>Maximum theoretical exposure under EU AI Act Article 99. "
+            "Actual enforcement depends on factors including severity, intent, "
+            "cooperation with authorities, and corrective measures taken. "
+            "This assessment is indicative and does not constitute legal advice.</i>",
+            SMALL_STYLE,
+        )
+    )
     flowables.append(Spacer(1, 10))
     return flowables
 

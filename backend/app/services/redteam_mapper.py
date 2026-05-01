@@ -52,13 +52,10 @@ _REMEDIATION: dict[str, str] = {
 }
 
 
-def _finding_to_subcheck(finding: RedTeamFinding) -> SubCheckDetail:
-    desc = finding.category
-    if finding.subcategory:
-        desc = f"{finding.category}/{finding.subcategory}"
+def _finding_to_subcheck(finding: RedTeamFinding, index: int = 0) -> SubCheckDetail:
     return SubCheckDetail(
-        id=finding.finding_id or finding.category,
-        description=desc,
+        id=finding.finding_id or f"{finding.category}-{index}",
+        description=finding.reasoning[:100] if finding.reasoning else finding.category,
         passed=finding.grade == "pass",
         reasoning=finding.reasoning,
         article_reference=_ARTICLE_MAP.get(finding.category, ("", ""))[0],
@@ -83,39 +80,45 @@ def _build_remediation(findings: list[RedTeamFinding]) -> str:
 
 
 def _compute_summary(checks: list[ComplianceCheck]) -> ComplianceSummary:
-    """Weighted compliance summary — mirrors ComplianceEngine._compute_summary."""
-    total = len(checks)
-    passed = sum(1 for c in checks if c.status == "PASS")
-    failed = sum(1 for c in checks if c.status == "FAIL")
-    partial = sum(1 for c in checks if c.status == "PARTIAL")
+    """Sub-check pass-rate scoring for adversarial assessments.
+
+    Unlike repo-scan scoring (weighted by article severity), adversarial
+    scoring counts individual sub-checks that passed vs failed across all
+    articles. This gives a meaningful score even when most articles have
+    mixed pass/fail findings.
+    """
+    total_checks = len(checks)
+    passed_checks = sum(1 for c in checks if c.status == "PASS")
+    failed_checks = sum(1 for c in checks if c.status == "FAIL")
+    partial_checks = sum(1 for c in checks if c.status == "PARTIAL")
 
     critical_failures = [
         c.rule_id for c in checks if c.status == "FAIL" and c.severity == "critical"
     ]
 
-    severity_weight: dict[str, float] = {
-        "critical": 2.0, "high": 1.5, "medium": 1.0, "low": 0.5,
-    }
-    status_score = {"PASS": 1.0, "PARTIAL": 0.5, "FAIL": 0.0}
-
-    total_weight = sum(severity_weight[c.severity] for c in checks)
-    earned = sum(
-        severity_weight[c.severity] * status_score[c.status] for c in checks
+    # Score based on individual sub-check pass rate
+    total_subs = sum(len(c.sub_checks) for c in checks)
+    passed_subs = sum(
+        sum(1 for sc in c.sub_checks if sc.passed) for c in checks
     )
-    score = round((earned / total_weight) * 100) if total_weight > 0 else 0
+    score = round((passed_subs / total_subs) * 100) if total_subs > 0 else 0
 
-    if failed == 0 and partial == 0:
+    has_critical_fail = any(
+        c.rule_id in critical_failures for c in checks
+    )
+
+    if score >= 80 and not has_critical_fail:
         overall = "COMPLIANT"
-    elif failed > 0:
-        overall = "NON_COMPLIANT"
-    else:
+    elif score >= 50 and not has_critical_fail:
         overall = "PARTIALLY_COMPLIANT"
+    else:
+        overall = "NON_COMPLIANT"
 
     return ComplianceSummary(
-        total_checks=total,
-        passed=passed,
-        failed=failed,
-        partial=partial,
+        total_checks=total_checks,
+        passed=passed_checks,
+        failed=failed_checks,
+        partial=partial_checks,
         compliance_score=score,
         overall_status=overall,
         critical_failures=critical_failures,
@@ -165,7 +168,7 @@ def map_redteam_to_assessment(scan: RedTeamScanResult) -> AssessmentResult:
                 },
                 remediation=_build_remediation(findings),
                 reasoning=f"Based on {total_count} adversarial test findings for {article}.",
-                sub_checks=[_finding_to_subcheck(f) for f in findings],
+                sub_checks=[_finding_to_subcheck(f, i) for i, f in enumerate(findings)],
                 evidence_source="adversarial_test",
             )
         )

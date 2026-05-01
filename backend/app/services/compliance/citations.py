@@ -55,7 +55,7 @@ ART_13: dict[str, str] = {
 ART_14: dict[str, str] = {
     "human_in_loop": "[Art. 14(1)] Human oversight measures built into or identified by provider",
     "override": "[Art. 14(4)(d)] Ability to override or reverse AI system output",
-    "escalation": "[Art. 14(4)(c)] Correctly interpret high-risk AI system's output",
+    "escalation": "[Art. 14(3)] Oversight measures including escalation and intervention procedures",
     "automation_bias": "[Art. 14(4)(b)] Awareness of possible automation bias tendency",
     "stop_mechanism": "[Art. 14(4)(e)] Stop button or similar procedure for safe halt",
 }
