@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AuditLens AI — Scan Repository</title>
   <meta name="description" content="Scan a GitHub repository for EU AI Act compliance evidence.">
+  <meta name="api-url" content="https://auditlens-9hox.onrender.com">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
@@ -172,6 +173,28 @@
     </div>
   </main>
 
+  <!-- Email-capture modal — shown before PDF download -->
+  <div id="email-modal" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center px-4">
+    <div class="bg-gray-900 border border-gray-700 rounded-lg max-w-md w-full p-6 space-y-4">
+      <div>
+        <h3 class="text-lg font-semibold text-white">Enter your email to receive your compliance report</h3>
+        <p class="text-xs text-gray-400 mt-1">We'll use your address to send compliance updates and improvements. The PDF downloads immediately after submitting.</p>
+      </div>
+      <input
+        id="email-modal-input"
+        type="email"
+        autocomplete="email"
+        placeholder="you@company.com"
+        class="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+      >
+      <p id="email-modal-error" class="hidden text-xs text-red-400"></p>
+      <div class="flex items-center justify-end gap-3 pt-2">
+        <button id="email-modal-skip" type="button" class="px-3 py-2 text-sm text-gray-400 hover:text-white transition-colors">Skip</button>
+        <button id="email-modal-submit" type="button" class="px-4 py-2 text-sm font-semibold bg-blue-600 hover:bg-blue-500 text-white rounded-md transition-colors">Download PDF</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Footer -->
   <footer class="border-t border-gray-800 py-6 mt-16">
     <div class="max-w-4xl mx-auto px-4 text-xs text-gray-500 space-y-2">
@@ -181,9 +204,10 @@
   </footer>
 
   <script>
-    const API_URL = window.location.hostname === 'localhost'
-      ? 'http://localhost:8000'
-      : 'https://auditlens-9hox.onrender.com';
+    const API_URL = document.querySelector('meta[name="api-url"]')?.content
+      || (window.location.hostname === 'localhost'
+          ? 'http://localhost:8000'
+          : 'https://auditlens-9hox.onrender.com');
 
     const ARTICLE_TITLES = {
       'EU_AI_ART_5':  'Prohibited AI Practices',
@@ -825,8 +849,22 @@
       } catch { /* silent */ }
     }
 
-    // --- PDF Download ---
-    $('download-pdf-btn').addEventListener('click', async () => {
+    // --- PDF Download (gated behind email-capture modal) ---
+    const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    function openEmailModal() {
+      const modal = $('email-modal');
+      $('email-modal-input').value = '';
+      $('email-modal-error').classList.add('hidden');
+      modal.classList.remove('hidden');
+      setTimeout(() => $('email-modal-input').focus(), 50);
+    }
+
+    function closeEmailModal() {
+      $('email-modal').classList.add('hidden');
+    }
+
+    async function downloadPdf() {
       if (!lastScannedUrl) return;
       const btn = $('download-pdf-btn');
       btn.disabled = true;
@@ -853,6 +891,38 @@
         btn.disabled = false;
         btn.textContent = 'Download PDF Report';
       }
+    }
+
+    $('download-pdf-btn').addEventListener('click', () => {
+      if (!lastScannedUrl) return;
+      openEmailModal();
+    });
+
+    $('email-modal-skip').addEventListener('click', closeEmailModal);
+
+    $('email-modal').addEventListener('click', (e) => {
+      if (e.target === $('email-modal')) closeEmailModal();
+    });
+
+    $('email-modal-submit').addEventListener('click', async () => {
+      const email = $('email-modal-input').value.trim();
+      const errEl = $('email-modal-error');
+      if (!EMAIL_RE.test(email)) {
+        errEl.textContent = 'Please enter a valid email address.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+      errEl.classList.add('hidden');
+
+      // Best-effort lead capture — never block the download on a failure.
+      fetch(`${API_URL}/api/v1/leads`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, scan_context: lastScannedUrl || '' }),
+      }).catch(() => {});
+
+      closeEmailModal();
+      await downloadPdf();
     });
 
     // --- GRC Platform Dropdown ---

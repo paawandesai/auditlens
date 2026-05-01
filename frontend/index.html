@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AuditLens AI — EU AI Act Compliance Evidence</title>
   <meta name="description" content="Scan GitHub repos and generate audit-ready compliance evidence for EU AI Act. Built for compliance officers, not developers.">
+  <meta name="api-url" content="https://auditlens-9hox.onrender.com">
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     .gradient-text { background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
@@ -136,7 +137,7 @@
         <span class="text-sm font-semibold">AuditLens AI</span>
         <div class="flex items-center gap-4 text-sm text-gray-500">
           <a href="/scanner.html" class="hover:text-gray-300">Scanner</a>
-          <a href="https://auditlens-9hox.onrender.com/docs" class="hover:text-gray-300" target="_blank" rel="noopener">API Docs</a>
+          <a id="api-docs-link" href="https://auditlens-9hox.onrender.com/docs" class="hover:text-gray-300" target="_blank" rel="noopener">API Docs</a>
         </div>
       </div>
       <div class="text-xs text-gray-600 space-y-1">
@@ -333,6 +334,15 @@
       `;
       return card;
     }
+
+    // Resolve API URL from <meta name="api-url"> with sensible fallback,
+    // then point the API Docs footer link at it. Keeps prod URL in HTML, not JS.
+    const API_URL = document.querySelector('meta[name="api-url"]')?.content
+      || (window.location.hostname === 'localhost'
+          ? 'http://localhost:8000'
+          : 'https://auditlens-9hox.onrender.com');
+    const docsLink = document.getElementById('api-docs-link');
+    if (docsLink) docsLink.href = `${API_URL}/docs`;
   </script>
 </body>
 </html>

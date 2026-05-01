@@ -12,6 +12,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.routers.evidence import router as evidence_router
+from app.routers.leads import router as leads_router
 from app.routers.redteam import router as redteam_router
 from app.routers.scans import router as scans_router
 from app.routers.taxonomy import router as taxonomy_router
@@ -31,20 +32,26 @@ app = FastAPI(
     version="0.3.0",
     description=(
         "**API-first EU AI Act compliance evidence service.**\n\n"
-        "Scans GitHub repositories for AI/ML usage and produces audit-ready "
-        "compliance reports formatted for GRC platforms (Vanta, Drata, Secureframe).\n\n"
+        "Scans GitHub repositories and adversarial red team results for AI/ML usage "
+        "and produces audit-ready compliance reports formatted for GRC platforms "
+        "(Vanta, Drata, Secureframe).\n\n"
         "## Capabilities\n"
-        "- **9 articles, 38 sub-checks**: Art. 5 (prohibited practices), Art. 9-15 "
-        "(high-risk obligations), Art. 50 (transparency)\n"
+        "- **18 articles, 83 sub-checks**: Art. 5 (prohibited practices), "
+        "Art. 6 & 8 (classification), Art. 9–15 (high-risk technical obligations), "
+        "Art. 16–17 (provider obligations), Art. 26–27 (deployer obligations), "
+        "Art. 50 (transparency), Art. 53 & 55 (general-purpose AI), "
+        "Art. 72 (post-market monitoring)\n"
         "- **Risk-tiered assessment**: Automatic risk classification determines which "
         "articles are scored vs advisory\n"
         "- **AST-based scanning**: Python import detection with file+line precision, "
         "call-chain analysis for 4 regulated patterns\n"
+        "- **Red team ingestion**: Adversarial findings mapped directly to "
+        "Articles 9, 12, 14, 15\n"
         "- **GRC export**: Vanta, Drata, Secureframe, and generic JSON formats\n"
         "- **PDF reports**: Audit-grade compliance evidence documents\n\n"
         "## Authentication\n"
-        "PDF downloads and GRC exports require a Bearer token.\n"
-        "Public repo scanning is available without authentication.\n\n"
+        "GRC export endpoints require a Bearer token. Repo scanning, PDF downloads, "
+        "evidence upload, and red team ingestion are public.\n\n"
         "## Rate Limits\n"
         "Scan endpoints: 10 requests/minute per IP.\n"
         "Read endpoints: 60 requests/minute per IP.\n\n"
@@ -115,6 +122,7 @@ app.include_router(scans_router)
 app.include_router(evidence_router)
 app.include_router(taxonomy_router)
 app.include_router(redteam_router)
+app.include_router(leads_router)
 
 
 @app.get("/health")

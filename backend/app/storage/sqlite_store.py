@@ -40,6 +40,16 @@ class ScanStore:
                 )
                 """
             )
+            self._conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS leads (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    email TEXT NOT NULL,
+                    scan_context TEXT DEFAULT '',
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
 
     def save_scan(self, scan_id: str, repo_url: str, result: dict) -> None:
         """Persist a scan result as a JSON blob."""
@@ -55,6 +65,14 @@ class ScanStore:
             self._conn.execute(
                 "INSERT OR REPLACE INTO redteam_scans (id, result_json, created_at) VALUES (?, ?, ?)",
                 (scan_id, json.dumps(result), datetime.now(timezone.utc).isoformat()),
+            )
+
+    def save_lead(self, email: str, scan_context: str = "") -> None:
+        """Persist a captured email lead. Allows multiple rows per email."""
+        with self._conn:
+            self._conn.execute(
+                "INSERT INTO leads (email, scan_context, created_at) VALUES (?, ?, ?)",
+                (email, scan_context, datetime.now(timezone.utc).isoformat()),
             )
 
     def get_scan(self, scan_id: str) -> dict | None:
