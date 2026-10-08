@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>AuditLens AI — Scan Repository</title>
   <meta name="description" content="Scan a GitHub repository for EU AI Act compliance evidence.">
-  <meta name="api-url" content="https://auditlens-9hox.onrender.com">
+  <meta name="api-url" content="https://auditlens-api-4ihm.onrender.com">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
@@ -226,10 +226,13 @@
   </footer>
 
   <script>
-    const API_URL = document.querySelector('meta[name="api-url"]')?.content
-      || (window.location.hostname === 'localhost'
-          ? 'http://localhost:8000'
-          : 'https://auditlens-9hox.onrender.com');
+    // Local pages always talk to the local backend: the deployed API's CORS
+    // allowlist rejects localhost origins, so the meta tag only applies when hosted.
+    const IS_LOCAL = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    const API_URL = IS_LOCAL
+      ? 'http://localhost:8000'
+      : (document.querySelector('meta[name="api-url"]')?.content
+          || 'https://auditlens-api-4ihm.onrender.com');
 
     const ARTICLE_TITLES = {
       'EU_AI_ART_5':  'Prohibited AI Practices',

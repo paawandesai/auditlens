@@ -111,7 +111,7 @@ uv run redteam push results/cross-model-v2/gpt4o/scan-20260427-182339.json \
 # → compliance-report-<scan_id>.pdf (Art. 14 FAIL: 11/42 tool-misuse prompts not passed; Art. 9 FAIL: 5/71 RAG-injection)
 ```
 
-Without `--endpoint`, `redteam push` posts to the hosted instance at `auditlens-9hox.onrender.com`.
+Without `--endpoint`, `redteam push` posts to the hosted instance at `auditlens-api-4ihm.onrender.com`.
 
 Set `GITHUB_TOKEN` to raise GitHub's anonymous limit of 60 requests/hour. Other settings are listed in `backend/.env.example`.
 
