@@ -128,6 +128,14 @@ def _get_scan(scan_id: str) -> dict | None:
 class RepoScanRequest(BaseModel):
     repository_url: str
     branch: str = "main"
+    # Role-based scoping — determines which articles are applicable.
+    # Valid: "provider", "deployer", "both", "gpai", "gpai_systemic",
+    #        "library", "tool", "undeclared". Anything else is normalised
+    #        to "undeclared" by the engine.
+    role: str = "undeclared"
+    # If true, the assessment honours Art. 11(1) simplified-documentation
+    # provisions for SMEs (< 250 employees, < EUR 50M turnover).
+    sme: bool = False
 
 
 async def _run_scan(
@@ -178,10 +186,10 @@ async def _run_scan(
             + GPAI_CHECKS + LIFECYCLE_CHECKS
         )
         advisory_engine = ComplianceEngine(HIGH_RISK_CHECKS)
-        advisory_checks = advisory_engine.run_advisory(scanner_output)
+        advisory_checks = advisory_engine.run_advisory(scanner_output, role=request.role)
 
     engine = ComplianceEngine(scored_checks)
-    assessment = engine.run(scanner_output)
+    assessment = engine.run(scanner_output, role=request.role, sme=request.sme)
     assessment.risk_tier = risk_level
     assessment.applicable_articles = all_article_names
     assessment.advisory_checks = advisory_checks
@@ -221,6 +229,8 @@ class CompleteScanRequest(BaseModel):
     branch: str = "main"
     evidence_ids: list[str] = []
     risk_level: str | None = None  # Required if no repo
+    role: str = "undeclared"
+    sme: bool = False
 
 
 @router.post("/repo/complete")
@@ -344,10 +354,10 @@ async def scan_repo_complete(request: Request, body: CompleteScanRequest) -> dic
             + GPAI_CHECKS + LIFECYCLE_CHECKS
         )
         advisory_engine = ComplianceEngine(HIGH_RISK_CHECKS)
-        advisory_checks = advisory_engine.run_advisory(scanner_output)
+        advisory_checks = advisory_engine.run_advisory(scanner_output, role=body.role)
 
     engine = ComplianceEngine(scored_checks)
-    assessment = engine.run(scanner_output)
+    assessment = engine.run(scanner_output, role=body.role, sme=body.sme)
     assessment.risk_tier = risk_level
     assessment.applicable_articles = all_article_names
     assessment.advisory_checks = advisory_checks

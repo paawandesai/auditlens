@@ -21,9 +21,12 @@ from app.services.pdf.sections import (
     build_config_signals_section,
     build_doc_validations_section,
     build_domains_section,
+    build_executive_paragraph,
     build_footer,
     build_header,
+    build_not_applicable_section,
     build_risk_section,
+    build_scope_section,
     build_summary_section,
 )
 
@@ -79,6 +82,11 @@ def generate_compliance_pdf(
         )
     )
 
+    # Scope statement (only for repo-scan style assessments — adversarial reports
+    # have their own scope semantics tied to the red-team target).
+    if not is_adversarial:
+        flowables.extend(build_scope_section(assessment))
+
     # Executive summary
     flowables.extend(
         build_summary_section(
@@ -87,6 +95,10 @@ def generate_compliance_pdf(
             is_adversarial=is_adversarial,
         )
     )
+
+    # Plain-English executive paragraph (only for repo-scan style)
+    if not is_adversarial:
+        flowables.extend(build_executive_paragraph(assessment))
 
     # Risk classification
     flowables.extend(build_risk_section(scanner_output.risk_classification))
@@ -136,8 +148,11 @@ def generate_compliance_pdf(
         for check in sorted_advisory:
             flowables.extend(build_article_section(check, advisory=True))
 
-    # Regulatory exposure (only if any checks failed)
+    # Regulatory exposure (only if any APPLICABLE checks failed)
     flowables.extend(build_regulatory_exposure_section(assessment.checks))
+
+    # Articles Not Applicable — single compact table at the bottom
+    flowables.extend(build_not_applicable_section(assessment.checks))
 
     # Footer
     flowables.extend(build_footer())

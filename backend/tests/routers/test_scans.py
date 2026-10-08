@@ -72,12 +72,15 @@ class TestScanRepoEndpoint:
         assert data["repository"] == "https://github.com/org/repo"
         assert "assessment" in data
         assert "scanner_output" in data
-        # Risk-tiered: non-HIGH repos get 10 scored checks
+        # Risk-tiered: non-HIGH repos list 10 checks
         # (Art. 5, 6, 50 universal + Art. 16, 17, 26, 27 organizational + Art. 53, 55 GPAI + Art. 72)
         # Art. 8-15 appear in advisory_checks
-        total_scored = data["assessment"]["summary"]["total_checks"]
+        checks = data["assessment"]["checks"]
         advisory = data["assessment"].get("advisory_checks") or []
-        assert total_scored + len(advisory) == 18  # 10 scored + 8 advisory
+        assert len(checks) + len(advisory) == 18  # 10 listed + 8 advisory
+        # No role declared: deployer-only (26, 27) and GPAI (53, 55) are N/A,
+        # so 6 checks are scored.
+        assert data["assessment"]["summary"]["total_checks"] == 6
 
     @respx.mock
     def test_repo_not_found_returns_404(self, api_client):

@@ -16,6 +16,7 @@ STATUS_COLORS: dict[str, Color] = {
     "PASS": HexColor("#2eb872"),
     "FAIL": HexColor("#d93636"),
     "PARTIAL": HexColor("#f2a60d"),
+    "N/A": HexColor("#888888"),
 }
 
 SEVERITY_COLORS: dict[str, Color] = {
@@ -23,6 +24,7 @@ SEVERITY_COLORS: dict[str, Color] = {
     "high": HexColor("#f27a0d"),
     "medium": HexColor("#f2bf0d"),
     "low": HexColor("#888888"),
+    "info": HexColor("#9ca3af"),
 }
 
 OVERALL_STATUS_COLORS: dict[str, Color] = {

@@ -24,6 +24,10 @@ from app.schemas.scanner import (
     DocValidation,
     RiskClassification,
 )
+from app.services.compliance.applicability import (
+    applicable_articles_for_role,
+    non_applicable_articles_for_role,
+)
 from app.services.pdf.styles import (
     BODY_STYLE,
     HEADING_STYLE,
@@ -51,6 +55,120 @@ def build_header(
             SMALL_STYLE,
         ),
         Spacer(1, 12),
+    ]
+
+
+_ROLE_LABELS: dict[str, str] = {
+    "provider": "Provider of an AI system",
+    "deployer": "Deployer (uses AI in a professional capacity)",
+    "both": "Provider AND Deployer",
+    "gpai": "Provider of a General-Purpose AI model",
+    "gpai_systemic": "Provider of a GPAI model with systemic risk",
+    "library": "OSS library / framework (not a deployed system)",
+    "tool": "Internal tool / utility (not a deployed system)",
+    "undeclared": "Not declared",
+}
+
+
+def build_scope_section(assessment: AssessmentResult) -> list[Flowable]:
+    """Page-1 scope statement: declared role, applicable / non-applicable articles.
+
+    Appears before the executive summary so every later finding is read in
+    context of *which* obligations the user agreed apply.
+    """
+    flowables: list[Flowable] = []
+    flowables.append(Paragraph("Assessment Scope", HEADING_STYLE))
+
+    role = assessment.role or "undeclared"
+    role_label = _ROLE_LABELS.get(role, role)
+
+    if not assessment.role_declared:
+        flowables.append(
+            Paragraph(
+                "<b><font color='#b45309'>ROLE NOT DECLARED — assessment is INDICATIVE only.</font></b><br/>"
+                "Without a declared role, universal and provider-side articles are "
+                "scored. Deployer-only (Art. 26, 27) and general-purpose AI model "
+                "(Art. 53, 55) obligations are not scored. Some findings may "
+                "not apply to your situation. Re-run with role=provider, deployer, "
+                "library, etc. for an accurate assessment.",
+                BODY_STYLE,
+            )
+        )
+        flowables.append(Spacer(1, 6))
+
+    applicable = applicable_articles_for_role(role)
+    non_applicable = non_applicable_articles_for_role(role)
+
+    rows = [
+        ["Declared Role", role_label],
+        ["Risk Tier", assessment.risk_tier or "UNDETERMINED"],
+        ["SME (Art. 11(1))", "Yes — simplified documentation" if assessment.sme else "No"],
+        ["Articles Applicable", ", ".join(applicable) if applicable else "—"],
+    ]
+    if non_applicable:
+        rows.append(["Articles Not Applicable", ", ".join(non_applicable)])
+
+    table = Table(rows, colWidths=[1.8 * inch, 4.2 * inch])
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f0f0f0")),
+        ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dddddd")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+        ("LEFTPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    flowables.append(table)
+    flowables.append(Spacer(1, 12))
+    return flowables
+
+
+def build_executive_paragraph(assessment: AssessmentResult) -> list[Flowable]:
+    """Plain-English one-paragraph summary that compliance officers brief from."""
+    summary = assessment.summary
+    role = assessment.role or "undeclared"
+    role_label = _ROLE_LABELS.get(role, role)
+    applicable = [c for c in assessment.checks if c.is_applicable]
+    n_total = len(applicable)
+    n_pass = sum(1 for c in applicable if c.status == "PASS")
+    n_fail = sum(1 for c in applicable if c.status == "FAIL")
+    n_partial = sum(1 for c in applicable if c.status == "PARTIAL")
+
+    # Pick the highest-severity FAIL or PARTIAL with remediation
+    severity_rank = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    candidates = [
+        c for c in applicable
+        if c.status in ("FAIL", "PARTIAL") and c.remediation
+    ]
+    candidates.sort(key=lambda c: (
+        severity_rank.get(c.severity, 4),
+        0 if c.status == "FAIL" else 1,
+    ))
+    if candidates:
+        top = candidates[0]
+        first_action = top.remediation.split(".")[0].strip()
+        next_step = (
+            f"focus on <b>{top.article} — {top.rule_name}</b>: {first_action}."
+        )
+    elif n_total == 0:
+        next_step = "no scored articles applied to this role; consider re-declaring the role if this is unexpected."
+    else:
+        next_step = "no FAIL or PARTIAL findings — maintain current documentation."
+
+    paragraph = (
+        f"Based on the declared role (<b>{role_label}</b>) and the codebase scan, "
+        f"<b>{n_total}</b> of 18 EU AI Act articles apply to your system. "
+        f"Of those, <b>{n_pass}</b> pass, <b>{n_partial}</b> partial, "
+        f"<b>{n_fail}</b> need attention. "
+        f"Compliance score: <b>{summary.compliance_score}/100</b>. "
+        f"Your most important next step is to {next_step}"
+    )
+
+    return [
+        Paragraph(paragraph, BODY_STYLE),
+        Spacer(1, 8),
     ]
 
 
@@ -143,6 +261,11 @@ def build_article_section(
     check: ComplianceCheck, *, advisory: bool = False,
 ) -> list[Flowable]:
     """Single article compliance check section with status, evidence, and remediation."""
+    # N/A checks render as a one-line "Not applicable" entry, NOT a full section.
+    # The full N/A breakdown lives in build_not_applicable_section() at the end.
+    if not check.is_applicable or check.status == "N/A":
+        return []
+
     flowables: list[Flowable] = []
 
     # Section heading with status badge
@@ -537,9 +660,14 @@ def build_regulatory_exposure_section(
 ) -> list[Flowable]:
     """Regulatory exposure based on failed articles and EU AI Act Article 99 penalties.
 
-    Only appears when at least one check has FAIL status.
+    Only appears when at least one *applicable* check has FAIL status.
+    Non-applicable checks (N/A) never contribute to penalty exposure — quoting
+    Art. 99 fines on out-of-scope obligations would be misleading.
     """
-    failed_checks = [c for c in checks if c.status == "FAIL"]
+    failed_checks = [
+        c for c in checks
+        if c.status == "FAIL" and c.is_applicable
+    ]
     if not failed_checks:
         return []
 
@@ -596,12 +724,69 @@ def build_regulatory_exposure_section(
     flowables.append(
         Paragraph(
             "<i>Maximum theoretical exposure under EU AI Act Article 99. "
+            "Penalties apply only to obligations relevant to your declared role. "
             "Actual enforcement depends on factors including severity, intent, "
             "cooperation with authorities, and corrective measures taken. "
             "This assessment is indicative and does not constitute legal advice.</i>",
             SMALL_STYLE,
         )
     )
+    flowables.append(Spacer(1, 10))
+    return flowables
+
+
+def build_not_applicable_section(
+    checks: list[ComplianceCheck],
+) -> list[Flowable]:
+    """Single compact section listing articles skipped as Not Applicable.
+
+    Appears at the bottom of the report so a reader can see *what was not
+    tested and why*, without it cluttering the scored sections.
+    """
+    na_checks = [c for c in checks if not c.is_applicable or c.status == "N/A"]
+    if not na_checks:
+        return []
+
+    flowables: list[Flowable] = []
+    flowables.append(Spacer(1, 12))
+    flowables.append(Paragraph("Articles Not Applicable", HEADING_STYLE))
+    flowables.append(
+        Paragraph(
+            "These articles were not scored because they do not apply to the "
+            "declared role, or because no role was declared and the obligation "
+            "depends on it. They are listed here for transparency.",
+            SMALL_STYLE,
+        )
+    )
+    flowables.append(Spacer(1, 6))
+
+    rows = [["Article", "Rule", "Status", "Reason"]]
+    for c in sorted(na_checks, key=lambda x: x.article):
+        reason = (c.reasoning or c.evidence.description or "").strip()
+        rows.append([c.article, c.rule_name, "N/A", reason[:120]])
+
+    table = Table(
+        rows,
+        colWidths=[0.9 * inch, 2.0 * inch, 0.6 * inch, 2.5 * inch],
+    )
+    style_cmds = [
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f0f0f0")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#dddddd")),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+    ]
+    for row_idx in range(1, len(rows)):
+        style_cmds.append(("BACKGROUND", (2, row_idx), (2, row_idx), STATUS_COLORS["N/A"]))
+        style_cmds.append(("TEXTCOLOR", (2, row_idx), (2, row_idx), colors.white))
+        style_cmds.append(("ALIGN", (2, row_idx), (2, row_idx), "CENTER"))
+    table.setStyle(TableStyle(style_cmds))
+
+    flowables.append(table)
     flowables.append(Spacer(1, 10))
     return flowables
 

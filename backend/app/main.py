@@ -41,14 +41,27 @@ app = FastAPI(
         "Art. 16–17 (provider obligations), Art. 26–27 (deployer obligations), "
         "Art. 50 (transparency), Art. 53 & 55 (general-purpose AI), "
         "Art. 72 (post-market monitoring)\n"
+        "- **Role-based scoping**: Articles only score when applicable to your "
+        "declared role (provider / deployer / both / gpai / gpai_systemic / "
+        "library / tool / undeclared). Out-of-scope articles return `N/A` and "
+        "do not affect the compliance score or Critical Failures banner. With no "
+        "declared role, deployer-only (Art. 26, 27) and GPAI-model (Art. 53, 55) "
+        "obligations are not scored.\n"
         "- **Risk-tiered assessment**: Automatic risk classification determines which "
-        "articles are scored vs advisory\n"
+        "high-risk technical articles are scored vs advisory\n"
         "- **AST-based scanning**: Python import detection with file+line precision, "
         "call-chain analysis for 4 regulated patterns\n"
         "- **Red team ingestion**: Adversarial findings mapped directly to "
         "Articles 9, 12, 14, 15\n"
         "- **GRC export**: Vanta, Drata, Secureframe, and generic JSON formats\n"
         "- **PDF reports**: Audit-grade compliance evidence documents\n\n"
+        "## What AuditLens does NOT test\n"
+        "- Deployment configuration (Kubernetes, IAM, cloud security posture)\n"
+        "- Runtime behaviour, model outputs, or live decisioning\n"
+        "- Training-data lineage beyond what is documented in the repository\n"
+        "- Downstream user impact, demographic harm, or real-world fairness\n"
+        "- Compliance documentation stored outside the repository (Confluence, "
+        "Notion, SharePoint, etc. — use `/api/v1/scans/repo/complete` to merge).\n\n"
         "## Authentication\n"
         "GRC export endpoints require a Bearer token. Repo scanning, PDF downloads, "
         "evidence upload, and red team ingestion are public.\n\n"
@@ -59,7 +72,7 @@ app = FastAPI(
         "```bash\n"
         "curl -X POST /api/v1/scans/repo \\\n"
         '  -H "Content-Type: application/json" \\\n'
-        '  -d \'{"repository_url": "https://github.com/org/repo"}\'\n'
+        '  -d \'{"repository_url": "https://github.com/org/repo", "role": "provider", "sme": false}\'\n'
         "```"
     ),
     contact={"name": "AuditLens", "url": "https://auditlens.ai"},

@@ -12,8 +12,12 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
-SeverityLiteral = Literal["critical", "high", "medium", "low"]
-StatusLiteral = Literal["PASS", "FAIL", "PARTIAL"]
+SeverityLiteral = Literal["critical", "high", "medium", "low", "info"]
+StatusLiteral = Literal["PASS", "FAIL", "PARTIAL", "N/A"]
+RoleLiteral = Literal[
+    "provider", "deployer", "both", "gpai", "gpai_systemic",
+    "library", "tool", "undeclared",
+]
 
 
 class CheckEvidence(BaseModel):
@@ -51,6 +55,7 @@ class ComplianceCheck(BaseModel):
     evidence_locations: list[str] = Field(default_factory=list)
     sub_checks: list[SubCheckDetail] = Field(default_factory=list)
     evidence_source: str = "repo_scan"
+    is_applicable: bool = True
 
 
 class ComplianceSummary(BaseModel):
@@ -78,3 +83,8 @@ class AssessmentResult(BaseModel):
     risk_tier: str | None = None
     applicable_articles: list[str] | None = None
     advisory_checks: list[ComplianceCheck] | None = None
+
+    # Role-based scoping (from scan request)
+    role: str = "undeclared"
+    sme: bool = False
+    role_declared: bool = False  # True when role != "undeclared"

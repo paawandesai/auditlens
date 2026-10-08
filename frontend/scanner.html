@@ -45,9 +45,30 @@
         <p id="deployer-hint" class="hidden mt-1 text-xs text-gray-500">Risk level will be auto-inferred from your uploaded documents.</p>
       </div>
 
-      <!-- Step 2: Supporting Documents -->
+      <!-- Step 1.5: Role declaration -->
       <div class="bg-gray-900 border border-gray-700 rounded-lg p-4">
-        <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">Step 2: Supporting Documents <span class="text-gray-500 font-normal">(optional)</span></h3>
+        <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">Step 2: Your Role</h3>
+        <p class="text-xs text-gray-500 mb-3">Tells AuditLens which articles apply. Without a declared role, only universal and provider-side articles are scored (deployer-only and GPAI-model obligations are skipped) and the report is marked INDICATIVE only.</p>
+        <label class="block text-sm text-gray-300 mb-1">What is your relationship to this AI system?</label>
+        <select id="role-select" class="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-200 w-full">
+          <option value="undeclared">I'm not sure (provider-side articles only, INDICATIVE)</option>
+          <option value="provider">I am the provider (we built / trained / placed it on the EU market)</option>
+          <option value="deployer">I am the deployer (we use it in our business)</option>
+          <option value="both">Both provider and deployer</option>
+          <option value="library">This is a library or framework (not a deployed system)</option>
+          <option value="tool">This is internal tooling (not a deployed system)</option>
+          <option value="gpai">I provide a General-Purpose AI model</option>
+          <option value="gpai_systemic">I provide a GPAI model with systemic risk</option>
+        </select>
+        <label class="flex items-center gap-2 mt-3 text-sm text-gray-400 cursor-pointer">
+          <input type="checkbox" id="sme-checkbox" class="rounded bg-gray-700 border-gray-600">
+          We are an SME (&lt; 250 employees, &lt; €50M turnover) — apply Art. 11(1) simplified documentation
+        </label>
+      </div>
+
+      <!-- Step 3: Supporting Documents -->
+      <div class="bg-gray-900 border border-gray-700 rounded-lg p-4">
+        <h3 class="text-sm font-semibold text-gray-400 uppercase tracking-wide mb-2">Step 3: Supporting Documents <span class="text-gray-500 font-normal">(optional)</span></h3>
         <p class="text-xs text-gray-500 mb-3">Upload compliance documents (QMS, FRIA, risk assessments, etc.) to improve assessment accuracy.</p>
         <div class="flex gap-2 mb-3">
           <select id="doc-type-select" class="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-gray-200 flex-1">
@@ -446,12 +467,17 @@
           ? `${API_URL}/api/v1/scans/repo/complete`
           : `${API_URL}/api/v1/scans/repo`;
 
+        const role = $('role-select')?.value || 'undeclared';
+        const sme = $('sme-checkbox')?.checked || false;
+
         const requestBody = hasEvidence || isDeployer
           ? {
               repository_url: isDeployer ? null : url,
               evidence_ids: uploadedEvidence.map(e => e.evidence_id),
+              role,
+              sme,
             }
-          : { repository_url: url };
+          : { repository_url: url, role, sme };
 
         const res = await fetch(endpoint, {
           method: 'POST',
@@ -870,10 +896,12 @@
       btn.disabled = true;
       btn.textContent = 'Generating...';
       try {
+        const role = $('role-select')?.value || 'undeclared';
+        const sme = $('sme-checkbox')?.checked || false;
         const res = await fetch(`${API_URL}/api/v1/scans/repo/pdf`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ repository_url: lastScannedUrl }),
+          body: JSON.stringify({ repository_url: lastScannedUrl, role, sme }),
         });
         if (!res.ok) throw new Error('PDF generation failed');
         const blob = await res.blob();
