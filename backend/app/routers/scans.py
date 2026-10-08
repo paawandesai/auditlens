@@ -3,7 +3,7 @@
 POST /api/v1/scans/repo — full compliance assessment JSON (public)
 POST /api/v1/scans/repo/complete — repo scan + uploaded evidence (public)
 POST /api/v1/scans/repo/pdf — audit-ready PDF report (public)
-POST /api/v1/scans/repo/export/{platform} — GRC-formatted JSON (auth required)
+POST /api/v1/scans/repo/export/{platform} — GRC-formatted JSON, demo control IDs (auth required)
 GET  /api/v1/scans/export/platforms — available GRC platforms (public)
 GET  /api/v1/scans/{scan_id} — retrieve stored scan result (public)
 """
@@ -47,6 +47,7 @@ from app.services.compliance.article_55 import Article55Check
 from app.services.compliance.article_72 import Article72Check
 from app.services.compliance.base import ComplianceEngine
 from app.services.grc.base import AdapterRegistry
+from app.services.grc.control_mappings import mapping_disclosure
 from app.services.grc.drata_adapter import DrataAdapter
 from app.services.grc.generic_adapter import GenericAdapter
 from app.services.grc.secureframe_adapter import SecureframeAdapter
@@ -387,8 +388,12 @@ async def scan_repo_complete(request: Request, body: CompleteScanRequest) -> dic
 @router.get("/export/platforms")
 @limiter.limit(RATE_LIMIT_READ)
 async def list_export_platforms(request: Request) -> dict:
-    """List available GRC export platforms."""
-    return {"platforms": GRC_REGISTRY.available_platforms()}
+    """List available GRC export platforms and whether their mappings are demo-only."""
+    platforms = GRC_REGISTRY.available_platforms()
+    return {
+        "platforms": platforms,
+        "mapping_status": {p: mapping_disclosure(p)["mapping_status"] for p in platforms},
+    }
 
 
 @router.get("")
@@ -470,4 +475,6 @@ async def scan_repo_export(
         )
 
     _, assessment = await _run_scan(body)
-    return adapter.translate(assessment)
+    payload = adapter.translate(assessment)
+    payload.update(mapping_disclosure(adapter.platform_name()))
+    return payload

@@ -190,6 +190,8 @@ class TestExportPlatformsEndpoint:
         assert "drata" in data["platforms"]
         assert "secureframe" in data["platforms"]
         assert "generic" in data["platforms"]
+        assert data["mapping_status"]["vanta"] == "demo"
+        assert data["mapping_status"]["generic"] == "native"
 
 
 class TestExportEndpoint:
@@ -219,6 +221,9 @@ class TestExportEndpoint:
         assert data["platform"] == "vanta"
         # Non-HIGH repos get 10 scored controls (universal + organizational + GPAI + lifecycle)
         assert len(data["controls"]) == 10
+        # Placeholder control IDs are labelled as a demo mapping in the payload
+        assert data["mapping_status"] == "demo"
+        assert "placeholder" in data["mapping_notice"]
 
     def test_unknown_platform_returns_400(self, api_client):
         response = api_client.post(

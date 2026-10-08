@@ -1,10 +1,37 @@
 """Static control ID mappings — article rule_ids to platform control IDs.
 
-These are placeholder mappings. Actual control IDs will be updated
-after researching Vanta/Drata/Secureframe APIs (Week 2, Priority 7).
+DEMO MAPPINGS. The Vanta / Drata / Secureframe control IDs below are
+illustrative placeholders that show the shape of each platform's payload.
+They are NOT real control IDs from those platforms and have not been
+validated against their APIs. Every export payload carries
+`mapping_disclosure()` so downstream consumers can see this.
 """
 
 from __future__ import annotations
+
+# Platforms whose control IDs in this module are illustrative placeholders.
+DEMO_MAPPING_PLATFORMS: frozenset[str] = frozenset({"vanta", "drata", "secureframe"})
+
+_DEMO_NOTICE = (
+    "Format demo: control IDs in this export are illustrative placeholders, "
+    "not real {platform} control IDs, and the payload has not been validated "
+    "against the {platform} API. Map controls manually before importing."
+)
+_NATIVE_NOTICE = (
+    "Control IDs are AuditLens rule IDs (EU_AI_ART_*); no third-party "
+    "control mapping is applied."
+)
+
+
+def mapping_disclosure(platform: str) -> dict[str, str]:
+    """Return the honesty fields attached to every GRC export payload."""
+    name = platform.lower()
+    if name in DEMO_MAPPING_PLATFORMS:
+        return {
+            "mapping_status": "demo",
+            "mapping_notice": _DEMO_NOTICE.format(platform=name.capitalize()),
+        }
+    return {"mapping_status": "native", "mapping_notice": _NATIVE_NOTICE}
 
 # Vanta uses AI-prefixed custom control IDs
 VANTA_CONTROL_MAP: dict[str, str] = {
