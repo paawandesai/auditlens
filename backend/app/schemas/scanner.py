@@ -205,6 +205,12 @@ class ScannerOutput(BaseModel):
     # Matched file paths per signal (populated by scanner, used by article checks)
     matched_paths: dict[str, list[str]] = Field(default_factory=dict)
 
+    # File paths that matched a compliance signal but whose fetched content
+    # is below the placeholder threshold (< MIN_PLACEHOLDER_CHARS). Article
+    # checks use this to avoid passing on empty / token files like a
+    # `RISK_ASSESSMENT.md` with one heading.
+    placeholder_paths: list[str] = Field(default_factory=list)
+
     # External evidence from uploaded documents
     external_evidence: list[dict] = Field(default_factory=list)
 

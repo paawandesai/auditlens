@@ -53,6 +53,32 @@ GITHUB_API = "https://api.github.com"
 REQUEST_TIMEOUT = 10.0
 MAX_CONCURRENT_FETCHES = 5
 
+# Files matching a compliance signal whose content is shorter than this are
+# treated as placeholders. 200 chars is enough for "title + 1 paragraph";
+# anything below it is almost certainly an empty stub.
+MIN_PLACEHOLDER_CHARS = 200
+
+
+def _detect_placeholder_paths(
+    file_contents: dict[str, str],
+    matched_paths: dict[str, list[str]],
+) -> list[str]:
+    """Return matched file paths whose fetched content is < MIN_PLACEHOLDER_CHARS.
+
+    Only files for which we already have content can be classified — for
+    file-presence-only matches (large repos, glob hits we didn't fetch) we
+    have no signal and assume non-placeholder.
+    """
+    matched: set[str] = set()
+    for paths in matched_paths.values():
+        matched.update(paths)
+    placeholders: list[str] = []
+    for path in matched:
+        content = file_contents.get(path)
+        if content is not None and len(content.strip()) < MIN_PLACEHOLDER_CHARS:
+            placeholders.append(path)
+    return placeholders
+
 # Files to fetch for content analysis (README + common doc files)
 CONTENT_FILES: list[str] = [
     "README.md", "readme.md", "README.rst", "README",
@@ -218,6 +244,14 @@ class GitHubScanner:
                     p for p in paths if p not in existing
                 )
 
+            # Detect placeholder files (matched a compliance signal but content
+            # is below the threshold — protects against empty RISK_ASSESSMENT.md).
+            # Only files we already fetched content for can be classified; the
+            # rest stay as-is (file-presence-only signal).
+            placeholder_paths = _detect_placeholder_paths(
+                file_contents, all_matched_paths,
+            )
+
             output = self._build_output(
                 repo_url=repo_url,
                 detected_frameworks=detected_frameworks,
@@ -229,6 +263,7 @@ class GitHubScanner:
                 detected_imports=all_detected_imports,
                 call_chain_findings=call_chain_findings,
                 matched_paths=all_matched_paths,
+                placeholder_paths=placeholder_paths,
             )
 
             # Pass 5: Risk classification (uses frameworks + domains)
@@ -426,6 +461,7 @@ class GitHubScanner:
         matched_paths: dict[str, list[str]] | None = None,
         detected_imports: list[DetectedImport] | None = None,
         call_chain_findings: list[CallChainFinding] | None = None,
+        placeholder_paths: list[str] | None = None,
     ) -> ScannerOutput:
         """Merge all scan results into a ScannerOutput."""
         # Merge boolean flags — tree OR content match triggers True
@@ -513,4 +549,5 @@ class GitHubScanner:
             detected_imports=detected_imports or [],
             call_chain_findings=call_chain_findings or [],
             matched_paths=matched_paths or {},
+            placeholder_paths=placeholder_paths or [],
         )

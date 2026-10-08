@@ -65,11 +65,23 @@ class Article09Check:
     }
 
     def evaluate(self, scanner_output: ScannerOutput) -> ComplianceCheck:
-        risk_assessment = scanner_output.has_risk_assessment
-        failure_modes = scanner_output.has_failure_modes_doc
-        mitigation = scanner_output.has_mitigation_plan
-        residual_risk = scanner_output.has_residual_risk_evaluation
-        testing_metrics = scanner_output.has_testing_metrics_defined
+        # Demote any flag whose only matching files are placeholders.
+        # Empty `RISK_ASSESSMENT.md` should not pass Art. 9(2)(a).
+        placeholders = set(scanner_output.placeholder_paths)
+
+        def _real(field: str) -> bool:
+            if not getattr(scanner_output, field, False):
+                return False
+            paths = scanner_output.matched_paths.get(field, [])
+            if not paths:
+                return True  # detection came from content flags, not file paths
+            return any(p not in placeholders for p in paths)
+
+        risk_assessment = _real("has_risk_assessment")
+        failure_modes = _real("has_failure_modes_doc")
+        mitigation = _real("has_mitigation_plan")
+        residual_risk = _real("has_residual_risk_evaluation")
+        testing_metrics = _real("has_testing_metrics_defined")
 
         sub_checks = {
             "risk_assessment_exists": risk_assessment,

@@ -64,11 +64,23 @@ class Article11Check:
     }
 
     def evaluate(self, scanner_output: ScannerOutput) -> ComplianceCheck:
-        model_card = scanner_output.has_model_card
-        architecture = scanner_output.has_architecture_docs
+        # Demote any flag whose only matching files are placeholders.
+        # An empty MODEL_CARD.md should not pass Art. 11.
+        placeholders = set(scanner_output.placeholder_paths)
+
+        def _real(field: str) -> bool:
+            if not getattr(scanner_output, field, False):
+                return False
+            paths = scanner_output.matched_paths.get(field, [])
+            if not paths:
+                return True
+            return any(p not in placeholders for p in paths)
+
+        model_card = _real("has_model_card")
+        architecture = _real("has_architecture_docs")
         performance = scanner_output.performance_metrics is not None
-        dev_process = scanner_output.has_development_process_docs
-        standards = scanner_output.has_standards_applied
+        dev_process = _real("has_development_process_docs")
+        standards = _real("has_standards_applied")
 
         sub_checks = {
             "model_card_exists": model_card,
