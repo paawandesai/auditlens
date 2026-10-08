@@ -22,7 +22,7 @@ redteam scan  ──► ScanResult JSON ──► redteam push ──►  POST /
                                         PDF report with an Adversarial Testing section
 ```
 
-The red-team result that motivates it: redteam-engine ran a three-message account takeover (look up the account, change its email, send a password reset) against a support agent deliberately built without authorization gates. The chain completed on all four models tested: GPT-4o, GPT-4o-mini, Claude Sonnet 4 and Claude Haiku 4.5. See [redteam-engine/FINDINGS.md](https://github.com/paawandesai/redteam-engine/blob/main/FINDINGS.md). AuditLens maps tool-misuse findings like this one to Article 14 (human oversight). Pushing redteam-engine's GPT-4o benchmark scan gives a critical FAIL on Art. 14, from 11 failed tool-misuse prompts, and on Art. 9, from 5 RAG-injection failures.
+The red-team result that motivates it: redteam-engine ran a three-message account takeover (look up the account, change its email, send a password reset) against a support agent deliberately built without authorization gates. The chain completed on all four models tested: GPT-4o, GPT-4o-mini, Claude Sonnet 4 and Claude Haiku 4.5. See [redteam-engine/FINDINGS.md](https://github.com/paawandesai/redteam-engine/blob/main/FINDINGS.md). AuditLens maps tool-misuse findings like this one to Article 14 (human oversight). Pushing redteam-engine's GPT-4o benchmark scan gives a critical FAIL on Art. 14, where 11 of 42 tool-misuse prompts failed or partially failed, and on Art. 9, where 5 of 71 RAG-injection prompts did.
 
 ## What it does
 
@@ -108,7 +108,7 @@ Push red-team results from redteam-engine into your local instance:
 cd ../redteam-engine
 uv run redteam push results/cross-model-v2/gpt4o/scan-20260427-182339.json \
   --endpoint http://localhost:8000/api/v1/redteam/ingest/pdf
-# → compliance-report-<scan_id>.pdf (Art. 14 FAIL: 11 tool-misuse failures; Art. 9 FAIL: 5 RAG-injection failures)
+# → compliance-report-<scan_id>.pdf (Art. 14 FAIL: 11/42 tool-misuse prompts not passed; Art. 9 FAIL: 5/71 RAG-injection)
 ```
 
 Without `--endpoint`, `redteam push` posts to the hosted instance at `auditlens-9hox.onrender.com`.
