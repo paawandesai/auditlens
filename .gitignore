@@ -1,7 +1,4 @@
-
 CLAUDE.md
-.DS_Store
-.coverage
 sprint_plan.md
 tmp/
 .claude/rules/
@@ -13,19 +10,32 @@ tmp/
 *.pem
 *.key
 
-# Python
+# Python build output, environments, caches
 __pycache__/
-*.pyc
-*.pyo
-.venv/
+*.py[cod]
 *.egg-info/
 dist/
 build/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+htmlcov/
 
-# SQLite database
-data/*.db
-data/*.db-journal
-data/*.db-wal
+# SQLite scan store and any other runtime data (e.g. backend/data/auditlens.db)
+data/
+*.db
+*.db-journal
+*.db-wal
+
+# OS / editor
+.DS_Store
+
+# Generated launch-video workspace
+brag-output/
 
 # Test fixtures (example compliance documents)
 test/
