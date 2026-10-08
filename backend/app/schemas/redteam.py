@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class ComplianceRef(BaseModel):
@@ -26,6 +26,13 @@ class RedTeamFinding(BaseModel):
     confidence: float = 0.9
     reasoning: str = ""
     compliance_refs: list[ComplianceRef] = []
+
+    @field_validator("category")
+    @classmethod
+    def _canonical_category(cls, value: str) -> str:
+        # redteam-engine emits snake_case enum values ("tool_misuse"); the
+        # mapper keys on kebab-case ("tool-misuse"). Accept both.
+        return value.strip().lower().replace("_", "-")
 
 
 class RedTeamScanResult(BaseModel):
